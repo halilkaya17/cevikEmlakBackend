@@ -11,20 +11,43 @@ const GENERAL_SETTINGS_TEMPLATE = {
           label: "Sosyal Medya Hesapları",
           type: "social-list",
           value: [
-            { id: "facebook",  platform: "Facebook",  url: "" },
+            { id: "facebook", platform: "Facebook", url: "" },
             { id: "instagram", platform: "Instagram", url: "" },
-            { id: "x",         platform: "X",         url: "" },
-            { id: "linkedin",  platform: "LinkedIn",  url: "" },
-            { id: "youtube",   platform: "Youtube",   url: "" },
+            { id: "x", platform: "X", url: "" },
+            { id: "linkedin", platform: "LinkedIn", url: "" },
+            { id: "youtube", platform: "Youtube", url: "" },
           ],
         },
+      ],
+    },
+    {
+      key: "mail",
+      label: "E-posta (SMTP)",
+      blocks: [
+        { key: "smtpHost", label: "SMTP Sunucu (host)", type: "text", value: "" },
+        { key: "smtpPort", label: "SMTP Port", type: "number", value: 587 },
+        { key: "smtpSecure", label: "TLS / SSL (güvenli bağlantı)", type: "boolean", value: false },
+        { key: "smtpUser", label: "SMTP Kullanıcı Adı", type: "text", value: "" },
+        { key: "smtpPass", label: "SMTP Şifre / Uygulama Şifresi", type: "textarea", value: "" },
+        { key: "mailFrom", label: "Gönderen e-posta (From)", type: "text", value: "" },
+        { key: "mailFromName", label: "Gönderen adı (From Name)", type: "text", value: "" },
       ],
     },
   ],
 };
 
+const LIST_BLOCK_TYPES = new Set(["social-list"]);
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeBlockValue(templateBlock, raw) {
+  if (!LIST_BLOCK_TYPES.has(templateBlock.type)) {
+    if (raw === undefined || raw === null) return templateBlock.value;
+    return raw;
+  }
+  return Array.isArray(raw) ? raw : templateBlock.value;
 }
 
 function normalizeGeneralSettings(page) {
@@ -40,19 +63,14 @@ function normalizeGeneralSettings(page) {
     const sourceSection = sourceSections.get(templateSection.key);
     if (!sourceSection) return templateSection;
 
-    const sourceBlockMap = new Map(
-      (sourceSection.blocks || []).map((b) => [b.key, b.value]),
-    );
+    const sourceBlockMap = new Map((sourceSection.blocks || []).map((b) => [b.key, b.value]));
 
     return {
       ...templateSection,
       blocks: templateSection.blocks.map((templateBlock) => {
         if (!sourceBlockMap.has(templateBlock.key)) return templateBlock;
-        const value = sourceBlockMap.get(templateBlock.key);
-        return {
-          ...templateBlock,
-          value: Array.isArray(value) ? value : templateBlock.value,
-        };
+        const value = normalizeBlockValue(templateBlock, sourceBlockMap.get(templateBlock.key));
+        return { ...templateBlock, value };
       }),
     };
   });
@@ -68,4 +86,69 @@ function extractSocialLinks(normalizedPage) {
   return links.filter((item) => item.url && item.url.trim() !== "");
 }
 
-module.exports = { GENERAL_SETTINGS_TEMPLATE, normalizeGeneralSettings, extractSocialLinks };
+function getBlockValue(sections, sectionKey, blockKey) {
+  const sec = (sections || []).find((s) => s.key === sectionKey);
+  const block = (sec?.blocks || []).find((b) => b.key === blockKey);
+  return block?.value;
+}
+
+function setBlockValue(sections, sectionKey, blockKey, value) {
+  const sec = (sections || []).find((s) => s.key === sectionKey);
+  if (!sec) return;
+  const block = (sec.blocks || []).find((b) => b.key === blockKey);
+  if (block) block.value = value;
+}
+
+/** Public GET: SMTP şifresini response'tan çıkar */
+function maskMailSecretsForPublic(page) {
+  const doc = page?.toObject ? page.toObject() : page;
+  if (!doc || doc.pageKey !== "genel-ayarlar") return page;
+  const next = clone(doc);
+  setBlockValue(next.sections, "mail", "smtpPass", "");
+  return next;
+}
+
+/**
+ * PUT sonrası: body'de smtpPass boşsa DB'deki mevcut şifreyi koru (yeniden yazmayı zorunlu kılma).
+ * payload normalize edilmiş PageContent dokümanı olmalı.
+ */
+function preserveSmtpPasswordIfEmpty(payload, existingLean) {
+  if (!payload || payload.pageKey !== "genel-ayarlar" || !existingLean) return payload;
+  const incoming = getBlockValue(payload.sections, "mail", "smtpPass");
+  const prev = getBlockValue(existingLean.sections, "mail", "smtpPass");
+  const incomingEmpty = incoming === undefined || incoming === null || String(incoming).trim() === "";
+  if (incomingEmpty && prev !== undefined && prev !== null && String(prev).trim() !== "") {
+    setBlockValue(payload.sections, "mail", "smtpPass", prev);
+  }
+  return payload;
+}
+
+function extractSmtpConfig(normalizedPage) {
+  const sections = normalizedPage?.sections || [];
+  const host = String(getBlockValue(sections, "mail", "smtpHost") || "").trim();
+  const portRaw = getBlockValue(sections, "mail", "smtpPort");
+  const port = Number(portRaw);
+  const secure = getBlockValue(sections, "mail", "smtpSecure") === true;
+  const user = String(getBlockValue(sections, "mail", "smtpUser") || "").trim();
+  const pass = String(getBlockValue(sections, "mail", "smtpPass") || "");
+  const from = String(getBlockValue(sections, "mail", "mailFrom") || "").trim() || user;
+  const fromName = String(getBlockValue(sections, "mail", "mailFromName") || "").trim();
+  return {
+    host,
+    port: Number.isFinite(port) && port > 0 ? port : 587,
+    secure,
+    user,
+    pass,
+    from,
+    fromName,
+  };
+}
+
+module.exports = {
+  GENERAL_SETTINGS_TEMPLATE,
+  normalizeGeneralSettings,
+  extractSocialLinks,
+  extractSmtpConfig,
+  maskMailSecretsForPublic,
+  preserveSmtpPasswordIfEmpty,
+};

@@ -35,6 +35,15 @@ const floorPlanSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const contentGalleryItemSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    publicId: { type: String, default: "" },
+    caption: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
 const listingSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -69,6 +78,7 @@ const listingSchema = new mongoose.Schema(
     images: [imageSchema],
     documents: [documentSchema],
     floorPlans: [floorPlanSchema],
+    contentGallery: [contentGalleryItemSchema],
     agent: { type: mongoose.Schema.Types.ObjectId, ref: "Agent" },
     viewCount: { type: Number, default: 0 },
     active: { type: Boolean, default: true },

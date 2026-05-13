@@ -23,6 +23,7 @@ const propertyFieldSchema = new mongoose.Schema(
     options: [optionSchema],
     required: { type: Boolean, default: false },
     showOnCard: { type: Boolean, default: false },
+    quickView: { type: Boolean, default: false },
   },
   { _id: false },
 );

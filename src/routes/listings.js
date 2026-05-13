@@ -37,6 +37,17 @@ function fingerprint(req) {
   return crypto.createHash("sha256").update(String(raw).split(",")[0]).digest("hex");
 }
 
+function normalizeContentGallery(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((item) => item && typeof item === "object" && item.url)
+    .map((item) => ({
+      url: item.url,
+      publicId: item.publicId || "",
+      caption: item.caption || "",
+    }));
+}
+
 router.get("/", async (req, res, next) => {
   try {
     const query = { active: true };
@@ -197,7 +208,9 @@ function buildFieldMap(category) {
           icon:       field.icon  || "",
           unit:       field.unit  || "",
           type:       field.type  || "text",
+          required:   field.required === true,
           showOnCard: field.showOnCard === true,
+          quickView:  field.quickView === true || field.showOnQuickView === true,
           groupKey:   group.key,
           groupLabel: group.name,
           options:    Array.isArray(field.options) ? field.options : [],
@@ -233,6 +246,10 @@ function formatPropertyGroups(rawValues, fieldMap) {
       label: meta.label,
       icon:  meta.icon,
       unit:  meta.unit,
+      type:  meta.type,
+      required: meta.required,
+      showOnCard: meta.showOnCard,
+      quickView: meta.quickView,
       value,
     });
   }
@@ -387,6 +404,9 @@ function formatPropertyGroupsFull(rawValues, fieldMap) {
       icon:  meta.icon,
       unit:  meta.unit,
       type:  meta.type,
+      required: meta.required,
+      showOnCard: meta.showOnCard,
+      quickView: meta.quickView,
       value: resolvedValue,
     });
   }
@@ -460,6 +480,7 @@ router.get("/detail/:id", async (req, res, next) => {
         gallery:    doc.images?.map((img) => ({ url: img.url, alt: img.alt || "" })) || [],
         floorPlans: doc.floorPlans || [],
         documents:  doc.documents  || [],
+        contentGallery: normalizeContentGallery(doc.contentGallery),
 
         agent: {
           _id:       doc.agent?._id?.toString() || "",
@@ -504,8 +525,10 @@ router.post("/", requireAuth, async (req, res, next) => {
     if (!category) return res.status(400).json({ message: "Kategori gecersiz" });
 
     const baseSlug = req.body.slug || req.body.title;
+    const payload = { ...req.body };
+    payload.contentGallery = normalizeContentGallery(req.body.contentGallery);
     const listing = await Listing.create({
-      ...req.body,
+      ...payload,
       slug: toSlug(`${baseSlug}-${req.body.listingNo || Date.now()}`),
       categorySlug: category.slug,
       publishedAt: req.body.status === "published" ? new Date() : null,
@@ -519,6 +542,9 @@ router.post("/", requireAuth, async (req, res, next) => {
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
     const payload = { ...req.body };
+    if (Array.isArray(req.body.contentGallery)) {
+      payload.contentGallery = normalizeContentGallery(req.body.contentGallery);
+    }
     if (payload.category) {
       const category = await Category.findById(payload.category);
       if (!category) return res.status(400).json({ message: "Kategori gecersiz" });

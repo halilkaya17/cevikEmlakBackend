@@ -9,9 +9,9 @@ const router = express.Router();
 const CORE_ROOT_CATEGORY_SLUGS = new Set(["konut", "isyeri", "is-yeri", "arsa", "proje"]);
 
 const requiredCoreFields = [
-  { key: "oda_sayisi", label: "Oda Sayısı", type: "text", unit: "", required: false, showOnCard: true, options: [] },
-  { key: "salon_sayisi", label: "Salon Sayısı", type: "text", unit: "", required: false, showOnCard: false, options: [] },
-  { key: "banyo_sayisi", label: "Banyo Sayısı", type: "text", unit: "", required: false, showOnCard: false, options: [] },
+  { key: "oda_sayisi", label: "Oda Sayısı", type: "text", unit: "", required: false, showOnCard: true, quickView: false, options: [] },
+  { key: "salon_sayisi", label: "Salon Sayısı", type: "text", unit: "", required: false, showOnCard: false, quickView: false, options: [] },
+  { key: "banyo_sayisi", label: "Banyo Sayısı", type: "text", unit: "", required: false, showOnCard: false, quickView: false, options: [] },
 ];
 
 /** "oda_sayisi" ve "oda-sayisi" gibi tire/alt çizgi farklarını eşit say */
@@ -81,15 +81,49 @@ function ensureCoreFields(propertyGroups = []) {
   });
 }
 
+function normalizePropertyGroups(propertyGroups = []) {
+  return (propertyGroups || []).map((group) => ({
+    ...group,
+    fields: (group.fields || []).map((field) => {
+      const quickView =
+        field.quickView === true ||
+        field.showOnQuickView === true ||
+        field.quickPreview === true ||
+        field.quick_preview === true ||
+        field.hizliGoruntule === true;
+      return {
+        ...field,
+        required: field.required === true,
+        showOnCard: field.showOnCard === true,
+        quickView,
+      };
+    }),
+  }));
+}
+
+function mapQuickViewAliasesForResponse(propertyGroups = []) {
+  return (propertyGroups || []).map((group) => ({
+    ...group,
+    fields: (group.fields || []).map((field) => ({
+      ...field,
+      showOnQuickView: field.quickView === true,
+    })),
+  }));
+}
+
 function normalizeCategory(category) {
   const source = category?.toObject ? category.toObject() : category;
   if (!source) return source;
   return {
     ...source,
-    propertyGroups: ensureCoreFields(source.propertyGroups),
+    propertyGroups: mapQuickViewAliasesForResponse(
+      ensureCoreFields(source.propertyGroups),
+    ),
     subcategories: (source.subcategories || []).map((subcategory) => ({
       ...subcategory,
-      propertyGroups: ensureCoreFields(subcategory.propertyGroups),
+      propertyGroups: mapQuickViewAliasesForResponse(
+        ensureCoreFields(subcategory.propertyGroups),
+      ),
     })),
   };
 }
@@ -108,12 +142,15 @@ router.post("/", requireAuth, async (req, res, next) => {
   try {
     const payload = { ...req.body };
     payload.slug = payload.slug || toSlug(payload.name);
+    if (payload.propertyGroups !== undefined) {
+      payload.propertyGroups = normalizePropertyGroups(payload.propertyGroups);
+    }
     if (Array.isArray(payload.subcategories)) {
       payload.subcategories = payload.subcategories.map((item) => ({
         ...item,
         name: item.name,
         slug: item.slug || toSlug(item.name),
-        propertyGroups: item.propertyGroups || [],
+        propertyGroups: normalizePropertyGroups(item.propertyGroups || []),
       }));
     }
     const tplErr = validateSubcategoriesPreserveTemplate(payload.propertyGroups, payload.subcategories);
@@ -132,12 +169,15 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 
     const payload = { ...req.body };
     if (payload.name && !payload.slug) payload.slug = toSlug(payload.name);
+    if (payload.propertyGroups !== undefined) {
+      payload.propertyGroups = normalizePropertyGroups(payload.propertyGroups);
+    }
     if (Array.isArray(payload.subcategories)) {
       payload.subcategories = payload.subcategories.map((item) => ({
         ...item,
         name: item.name,
         slug: item.slug || toSlug(item.name),
-        propertyGroups: item.propertyGroups || [],
+        propertyGroups: normalizePropertyGroups(item.propertyGroups || []),
       }));
     }
 

@@ -6,7 +6,7 @@ const blockSchema = new mongoose.Schema(
     label: { type: String, required: true },
     type: {
       type: String,
-      enum: ["text", "textarea", "number", "image", "media", "video", "json", "stat-list", "string-list", "metric-list", "accordion-list", "location-list", "blog-featured-list", "blog-side-list", "featured-project-list", "slider-list", "timeline-list", "social-list"],
+      enum: ["text", "textarea", "number", "boolean", "image", "media", "video", "json", "stat-list", "string-list", "metric-list", "accordion-list", "location-list", "blog-featured-list", "blog-side-list", "featured-project-list", "slider-list", "timeline-list", "social-list"],
       default: "text",
     },
     value: { type: mongoose.Schema.Types.Mixed, default: "" },

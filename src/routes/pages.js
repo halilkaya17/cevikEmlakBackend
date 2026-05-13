@@ -3,7 +3,7 @@ const PageContent = require("../models/PageContent");
 const { requireAuth } = require("../middleware/auth");
 const { normalizeHomePage, HOME_PAGE_TEMPLATE } = require("../utils/homePage");
 const { normalizeHakkimizdaPage, HAKKIMIZDA_PAGE_TEMPLATE } = require("../utils/hakkimizdaPage");
-const { normalizeGeneralSettings, GENERAL_SETTINGS_TEMPLATE } = require("../utils/generalSettings");
+const { normalizeGeneralSettings, GENERAL_SETTINGS_TEMPLATE, maskMailSecretsForPublic, preserveSmtpPasswordIfEmpty } = require("../utils/generalSettings");
 
 const router = express.Router();
 
@@ -36,6 +36,13 @@ function normalizePage(page) {
   return source;
 }
 
+/** Public: genel-ayarlar içinde SMTP şifresini maskele */
+function normalizePagePublic(page) {
+  const n = normalizePage(page);
+  if (n?.pageKey === "genel-ayarlar") return maskMailSecretsForPublic(n);
+  return n;
+}
+
 function normalizePayload(pageKey, payload) {
   if (pageKey === "home") return normalizeHomePage({ ...HOME_PAGE_TEMPLATE, ...payload, pageKey: "home" });
   if (pageKey === "hakkimizda") return normalizeHakkimizdaPage({ ...HAKKIMIZDA_PAGE_TEMPLATE, ...payload, pageKey: "hakkimizda" });
@@ -56,7 +63,7 @@ async function findOrCreate(pageKey) {
 router.get("/", async (_req, res, next) => {
   try {
     const pages = await PageContent.find().sort({ title: 1 });
-    res.json({ pages: pages.map(normalizePage) });
+    res.json({ pages: pages.map(normalizePagePublic) });
   } catch (error) {
     next(error);
   }
@@ -65,7 +72,7 @@ router.get("/", async (_req, res, next) => {
 router.get("/:pageKey", async (req, res, next) => {
   try {
     const page = await findOrCreate(req.params.pageKey);
-    return res.json({ page: normalizePage(page) });
+    return res.json({ page: normalizePagePublic(page) });
   } catch (error) {
     return next(error);
   }
@@ -73,13 +80,17 @@ router.get("/:pageKey", async (req, res, next) => {
 
 router.put("/:pageKey", requireAuth, async (req, res, next) => {
   try {
-    const payload = normalizePayload(req.params.pageKey, req.body);
+    let payload = normalizePayload(req.params.pageKey, req.body);
+    if (req.params.pageKey === "genel-ayarlar") {
+      const existing = await PageContent.findOne({ pageKey: "genel-ayarlar" }).lean();
+      payload = preserveSmtpPasswordIfEmpty(payload, existing);
+    }
     const page = await PageContent.findOneAndUpdate(
       { pageKey: req.params.pageKey },
       payload,
       { new: true, runValidators: true, upsert: true },
     );
-    res.json({ page: normalizePage(page) });
+    res.json({ page: normalizePagePublic(page) });
   } catch (error) {
     next(error);
   }
