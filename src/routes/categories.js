@@ -51,7 +51,9 @@ function validateSubcategoriesPreserveTemplate(propertyGroupsTemplate, subcatego
 }
 
 function ensureCoreFields(propertyGroups = []) {
-  return (propertyGroups || []).map((group) => {
+  return (propertyGroups || [])
+    .filter((group) => group && typeof group === "object")
+    .map((group) => {
     // Tüm gruplarda önce kopyaları temizle (normalized key'e göre ilk geçen kazanır)
     const seen = new Set();
     let fields = (group.fields || []).filter((f) => {
@@ -114,15 +116,16 @@ function mapQuickViewAliasesForResponse(propertyGroups = []) {
 function normalizeCategory(category) {
   const source = category?.toObject ? category.toObject() : category;
   if (!source) return source;
+  const propertyGroups = (source.propertyGroups || []).filter((g) => g && typeof g === "object");
   return {
     ...source,
     propertyGroups: mapQuickViewAliasesForResponse(
-      ensureCoreFields(source.propertyGroups),
+      ensureCoreFields(propertyGroups),
     ),
     subcategories: (source.subcategories || []).map((subcategory) => ({
       ...subcategory,
       propertyGroups: mapQuickViewAliasesForResponse(
-        ensureCoreFields(subcategory.propertyGroups),
+        ensureCoreFields((subcategory.propertyGroups || []).filter((g) => g && typeof g === "object")),
       ),
     })),
   };

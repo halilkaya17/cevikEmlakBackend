@@ -14,10 +14,35 @@ fs.mkdirSync(uploadDir, { recursive: true });
 
 const adminDir = path.join(__dirname, "../../admin");
 
-const origins = (process.env.CLIENT_ORIGIN || "")
+const rawClientOrigins = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
+
+function truthyEnv(value) {
+  return value === "1" || value === "true" || value === "yes" || value === "TRUE";
+}
+
+/** CORS + hata cevaplarında aynı kural (hata handler başlık yazabilsin) */
+function isRequestOriginAllowed(originHeader) {
+  if (!originHeader) return true;
+  if (!rawClientOrigins.length) return true;
+  if (rawClientOrigins.includes(originHeader)) return true;
+  if (truthyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) {
+    if (/^https:\/\/.+\.vercel\.app$/i.test(originHeader)) return true;
+  }
+  return false;
+}
+
+/** cors paketine verilecek origin seçeneği — asla Error ile callback yok (500 + başlıksız yanıt) */
+function buildCorsOriginOption() {
+  if (!rawClientOrigins.length) return true;
+  const list = [...rawClientOrigins];
+  if (truthyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) {
+    list.push(/^https:\/\/.+\.vercel\.app$/i);
+  }
+  return list;
+}
 
 app.use(
   helmet({
@@ -39,10 +64,7 @@ app.use(
 
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin || origins.length === 0 || origins.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS blocked: ${origin}`));
-    },
+    origin: buildCorsOriginOption(),
     credentials: true,
   }),
 );
@@ -95,7 +117,13 @@ app.use((req, res) => {
   res.status(404).json({ message: `${req.method} ${req.originalUrl} bulunamadi` });
 });
 
-app.use((error, _req, res, _next) => {
+app.use((error, req, res, _next) => {
+  const origin = req.headers.origin;
+  if (!res.headersSent && origin && isRequestOriginAllowed(origin) && !res.getHeader("Access-Control-Allow-Origin")) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.append("Vary", "Origin");
+  }
   const status = error.status || 500;
   const message = error.code === 11000 ? "Bu kayit zaten var" : error.message || "Sunucu hatasi";
   res.status(status).json({ message });
