@@ -1,6 +1,8 @@
 const express = require("express");
 const ContactPage = require("../models/ContactPage");
+const PageContent = require("../models/PageContent");
 const { requireAuth } = require("../middleware/auth");
+const { normalizeGeneralSettings, extractSocialLinks, GENERAL_SETTINGS_TEMPLATE } = require("../utils/generalSettings");
 
 const router = express.Router();
 
@@ -15,8 +17,15 @@ function emptyDoc() {
     mapLatitude: null,
     mapLongitude: null,
     mapZoom: 15,
-    social: [],
   };
+}
+
+async function getSocialLinks() {
+  let settingsPage = await PageContent.findOne({ pageKey: "genel-ayarlar" });
+  if (!settingsPage) {
+    settingsPage = await PageContent.create(GENERAL_SETTINGS_TEMPLATE);
+  }
+  return extractSocialLinks(normalizeGeneralSettings(settingsPage));
 }
 
 /** GET — herkese açık */
@@ -26,7 +35,8 @@ router.get("/", async (_req, res, next) => {
     if (!doc) {
       doc = await ContactPage.create(emptyDoc());
     }
-    res.json({ contact: doc.toObject() });
+    const social = await getSocialLinks();
+    res.json({ contact: { ...doc.toObject(), social } });
   } catch (err) {
     next(err);
   }
@@ -43,7 +53,7 @@ function sanitizeBody(body) {
   out.mapLongitude = parseCoord(body.mapLongitude);
   const z = parseCoord(body.mapZoom);
   out.mapZoom = z != null ? Math.min(21, Math.max(1, Math.round(z))) : 15;
-  if (!Array.isArray(out.social)) out.social = [];
+  delete out.social;
   return out;
 }
 
@@ -56,10 +66,10 @@ router.put("/", requireAuth, async (req, res, next) => {
       doc = await ContactPage.create(body);
     } else {
       Object.assign(doc, body);
-      doc.markModified("social");
       await doc.save();
     }
-    res.json({ contact: doc.toObject() });
+    const social = await getSocialLinks();
+    res.json({ contact: { ...doc.toObject(), social } });
   } catch (err) {
     next(err);
   }
