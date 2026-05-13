@@ -8,8 +8,24 @@ const router = express.Router();
 router.get("/", async (req, res, next) => {
   try {
     const query = req.query.all ? {} : { status: "published" };
-    const posts = await BlogPost.find(query).sort({ createdAt: -1 });
-    res.json({ posts });
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 10)));
+    const skip = (page - 1) * limit;
+
+    const [posts, total] = await Promise.all([
+      BlogPost.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      BlogPost.countDocuments(query),
+    ]);
+
+    res.json({
+      posts,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (error) {
     next(error);
   }

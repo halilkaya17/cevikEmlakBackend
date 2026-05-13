@@ -4,6 +4,7 @@ const { requireAuth } = require("../middleware/auth");
 const { normalizeHomePage, HOME_PAGE_TEMPLATE } = require("../utils/homePage");
 const { normalizeHakkimizdaPage, HAKKIMIZDA_PAGE_TEMPLATE } = require("../utils/hakkimizdaPage");
 const { normalizeGeneralSettings, GENERAL_SETTINGS_TEMPLATE, maskMailSecretsForPublic, preserveSmtpPasswordIfEmpty } = require("../utils/generalSettings");
+const { enrichHomePageFeaturedListings } = require("../utils/homeFeaturedListings");
 
 const router = express.Router();
 
@@ -72,7 +73,11 @@ router.get("/", async (_req, res, next) => {
 router.get("/:pageKey", async (req, res, next) => {
   try {
     const page = await findOrCreate(req.params.pageKey);
-    return res.json({ page: normalizePagePublic(page) });
+    let pageJson = normalizePagePublic(page);
+    if (req.params.pageKey === "home") {
+      pageJson = await enrichHomePageFeaturedListings(pageJson);
+    }
+    return res.json({ page: pageJson });
   } catch (error) {
     return next(error);
   }
@@ -90,7 +95,11 @@ router.put("/:pageKey", requireAuth, async (req, res, next) => {
       payload,
       { new: true, runValidators: true, upsert: true },
     );
-    res.json({ page: normalizePagePublic(page) });
+    let pageJson = normalizePagePublic(page);
+    if (req.params.pageKey === "home") {
+      pageJson = await enrichHomePageFeaturedListings(pageJson);
+    }
+    res.json({ page: pageJson });
   } catch (error) {
     next(error);
   }

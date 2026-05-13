@@ -14,6 +14,10 @@ PUT  /api/v1/pages/genel-ayarlar   →  Authorization: Bearer <admin JWT>
 `GET` **herkese açık** (token gerekmez).  
 `PUT` sadece **admin** (JWT zorunlu).
 
+İlk `GET /api/v1/pages/genel-ayarlar` çağrısında kayıt yoksa sunucu **varsayılan şablonu** oluşturur (`findOrCreate`).
+
+**Not:** `PUT` başarılı olduktan sonra dönen `page` cevabında da **`smtpPass` maskelenir** (GET ile aynı). Admin panel kayıt sonrası şifre alanını yine boş görür; bu beklenen davranıştır (şifre veritabanında kalır, JSON’da dönmez).
+
 ---
 
 ## GET — Ayarları okuma
@@ -128,6 +132,8 @@ Dönen listede `genel-ayarlar` da vardır; yine **`smtpPass` maskelenmiş** olur
 ## İletişim sayfası ile ilişki
 
 İletişim API’si (`GET /api/v1/contact-page`) içindeki **`social`** listesi, bu sayfadaki sosyal ayarlardan üretilir; iletişim kaydında ayrıca `social` tutulmaz. Site genelinde tek kaynak: **`genel-ayarlar` → `social` → `links`**.
+
+Site üzerinden **arama talebi** formu (`POST /api/v1/search-request`) giden maili de aynı **SMTP** ayarlarıyla gönderir; alıcı adres olarak **iletişim sayfası**ndaki `email` kullanılır. Ayrıntı: `docs/search-request-api.md`.
 
 ---
 

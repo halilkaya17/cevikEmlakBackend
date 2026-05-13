@@ -112,6 +112,21 @@ function parseListValue(value, fallback) {
   return fallback;
 }
 
+/** CMS satırı: kayıtta ve normalize çıktısında sadece bu alanlar kalır; tam ilan GET /pages/home ile `listing` olarak eklenir. */
+const FEATURED_PROJECT_ROW_KEYS = ["id", "listingId", "title", "description"];
+
+function sanitizeFeaturedProjectListItems(value) {
+  if (!Array.isArray(value)) return value;
+  return value.map((item) => {
+    if (!item || typeof item !== "object") return item;
+    const row = {};
+    for (const key of FEATURED_PROJECT_ROW_KEYS) {
+      if (item[key] !== undefined && item[key] !== null) row[key] = item[key];
+    }
+    return row;
+  });
+}
+
 function normalizeBlockValue(templateBlock, value) {
   const listTypes = new Set(["stat-list", "string-list", "metric-list", "accordion-list", "location-list", "blog-featured-list", "blog-side-list", "featured-project-list"]);
   if (listTypes.has(templateBlock.type)) {
@@ -157,6 +172,12 @@ function normalizeHomePage(page) {
       }),
     };
   });
+
+  const featuredSection = next.sections.find((s) => s.key === "featured");
+  const projectsBlock = featuredSection?.blocks?.find((b) => b.key === "projects" && b.type === "featured-project-list");
+  if (projectsBlock && Array.isArray(projectsBlock.value)) {
+    projectsBlock.value = sanitizeFeaturedProjectListItems(projectsBlock.value);
+  }
 
   return next;
 }
