@@ -14,35 +14,79 @@ fs.mkdirSync(uploadDir, { recursive: true });
 
 const adminDir = path.join(__dirname, "../../admin");
 
+function normalizeOriginUrl(value) {
+  if (!value || typeof value !== "string") return "";
+  return value.trim().replace(/\/+$/, "");
+}
+
 const rawClientOrigins = (process.env.CLIENT_ORIGIN || "")
   .split(",")
-  .map((item) => item.trim())
+  .map((item) => normalizeOriginUrl(item))
   .filter(Boolean);
 
 function truthyEnv(value) {
   return value === "1" || value === "true" || value === "yes" || value === "TRUE";
 }
 
-/** CORS + hata cevaplarında aynı kural (hata handler başlık yazabilsin) */
+function falsyEnv(value) {
+  return value === "0" || value === "false" || value === "no" || value === "FALSE";
+}
+
+/** Tüm origin’lere izin (credentials ile birlikte: gelen Origin yansıtılır). Render’da acil çözüm için CORS_ALLOW_ALL=true */
+const corsAllowAll =
+  truthyEnv(process.env.CORS_ALLOW_ALL) ||
+  rawClientOrigins.some((o) => o === "*" || /^all$/i.test(o));
+
+/** Vercel preview (*.vercel.app): açık flag veya CLIENT_ORIGIN içinde zaten bir vercel.app adresi varsa */
+function vercelWildcardAllowed() {
+  if (truthyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) return true;
+  if (falsyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) return false;
+  return rawClientOrigins.some((o) => /\.vercel\.app$/i.test(o));
+}
+
+const vercelOriginRegex = /^https:\/\/.+\.vercel\.app$/i;
+
+/** CORS + 404 + hata cevaplarında aynı kural */
 function isRequestOriginAllowed(originHeader) {
   if (!originHeader) return true;
+  if (corsAllowAll) return true;
+  const o = normalizeOriginUrl(originHeader);
   if (!rawClientOrigins.length) return true;
-  if (rawClientOrigins.includes(originHeader)) return true;
-  if (truthyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) {
-    if (/^https:\/\/.+\.vercel\.app$/i.test(originHeader)) return true;
-  }
+  const listed = rawClientOrigins.filter((x) => x !== "*" && !/^all$/i.test(x));
+  if (!listed.length) return true;
+  if (listed.includes(o)) return true;
+  if (vercelWildcardAllowed() && vercelOriginRegex.test(o)) return true;
   return false;
 }
 
-/** cors paketine verilecek origin seçeneği — asla Error ile callback yok (500 + başlıksız yanıt) */
+/** cors paketine verilecek origin — Error callback kullanılmaz */
 function buildCorsOriginOption() {
+  if (corsAllowAll) return true;
   if (!rawClientOrigins.length) return true;
-  const list = [...rawClientOrigins];
-  if (truthyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) {
-    list.push(/^https:\/\/.+\.vercel\.app$/i);
+  const list = rawClientOrigins.filter((o) => o !== "*" && !/^all$/i.test(o));
+  if (!list.length) return true;
+  if (vercelWildcardAllowed()) {
+    list.push(vercelOriginRegex);
   }
   return list;
 }
+
+function applyCorsHeadersIfAllowed(req, res) {
+  const origin = req.headers.origin;
+  if (!origin || !isRequestOriginAllowed(origin) || res.getHeader("Access-Control-Allow-Origin")) return;
+  res.setHeader("Access-Control-Allow-Origin", normalizeOriginUrl(origin));
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.append("Vary", "Origin");
+}
+
+app.use(
+  cors({
+    origin: buildCorsOriginOption(),
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    optionsSuccessStatus: 204,
+  }),
+);
 
 app.use(
   helmet({
@@ -62,12 +106,6 @@ app.use(
   }),
 );
 
-app.use(
-  cors({
-    origin: buildCorsOriginOption(),
-    credentials: true,
-  }),
-);
 app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -114,15 +152,13 @@ app.use(`${API_PREFIX}/icons`, require("./routes/icons"));
 app.use(`${API_PREFIX}/search-request`, require("./routes/searchRequest"));
 
 app.use((req, res) => {
+  applyCorsHeadersIfAllowed(req, res);
   res.status(404).json({ message: `${req.method} ${req.originalUrl} bulunamadi` });
 });
 
 app.use((error, req, res, _next) => {
-  const origin = req.headers.origin;
-  if (!res.headersSent && origin && isRequestOriginAllowed(origin) && !res.getHeader("Access-Control-Allow-Origin")) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.append("Vary", "Origin");
+  if (!res.headersSent) {
+    applyCorsHeadersIfAllowed(req, res);
   }
   const status = error.status || 500;
   const message = error.code === 11000 ? "Bu kayit zaten var" : error.message || "Sunucu hatasi";
