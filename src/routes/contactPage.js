@@ -15,6 +15,7 @@ function emptyDoc() {
     email: "",
     address: "",
     mapUrl: "",
+    workingHours: "",
   };
 }
 

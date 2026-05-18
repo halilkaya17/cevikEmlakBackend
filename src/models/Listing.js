@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const imageSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },
+    publicId: { type: String, default: "" },
+    type: { type: String, enum: ["image", "video"], default: "image" },
     alt: { type: String, default: "" },
     isCover: { type: Boolean, default: false },
   },
@@ -88,5 +90,6 @@ const listingSchema = new mongoose.Schema(
 );
 
 listingSchema.index({ title: "text", city: "text", district: "text", summary: "text" });
+listingSchema.index({ listingNo: 1 });
 
 module.exports = mongoose.model("Listing", listingSchema);

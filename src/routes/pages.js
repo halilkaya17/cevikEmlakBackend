@@ -4,7 +4,7 @@ const { requireAuth } = require("../middleware/auth");
 const { normalizeHomePage, HOME_PAGE_TEMPLATE } = require("../utils/homePage");
 const { normalizeHakkimizdaPage, HAKKIMIZDA_PAGE_TEMPLATE } = require("../utils/hakkimizdaPage");
 const { normalizeGeneralSettings, GENERAL_SETTINGS_TEMPLATE, maskMailSecretsForPublic, preserveSmtpPasswordIfEmpty } = require("../utils/generalSettings");
-const { enrichHomePageFeaturedListings } = require("../utils/homeFeaturedListings");
+const { enrichHomePageFeaturedListings, enrichHomePageLocationCounts } = require("../utils/homeFeaturedListings");
 
 const router = express.Router();
 
@@ -76,6 +76,7 @@ router.get("/:pageKey", async (req, res, next) => {
     let pageJson = normalizePagePublic(page);
     if (req.params.pageKey === "home") {
       pageJson = await enrichHomePageFeaturedListings(pageJson);
+      pageJson = await enrichHomePageLocationCounts(pageJson);
     }
     return res.json({ page: pageJson });
   } catch (error) {
@@ -98,6 +99,7 @@ router.put("/:pageKey", requireAuth, async (req, res, next) => {
     let pageJson = normalizePagePublic(page);
     if (req.params.pageKey === "home") {
       pageJson = await enrichHomePageFeaturedListings(pageJson);
+      pageJson = await enrichHomePageLocationCounts(pageJson);
     }
     res.json({ page: pageJson });
   } catch (error) {

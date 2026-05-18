@@ -13,31 +13,60 @@ function normalizeContentGallery(input) {
     }));
 }
 
-function buildFieldMap(category) {
+function normalizeListingImages(images) {
+  if (!Array.isArray(images)) return [];
+  return images.map((img) => ({
+    url: img.url,
+    publicId: img.publicId || "",
+    type: img.type || "image",
+    alt: img.alt || "",
+    isCover: img.isCover || false,
+  }));
+}
+
+function fieldToMeta(field, group) {
+  return {
+    label: field.label || field.key,
+    icon: field.icon || "",
+    unit: field.unit || "",
+    type: field.type || "text",
+    required: field.required === true,
+    showOnCard: field.showOnCard === true,
+    quickView: field.quickView === true || field.showOnQuickView === true,
+    groupKey: group.key,
+    groupLabel: group.name,
+    options: Array.isArray(field.options) ? field.options : [],
+  };
+}
+
+function buildFieldMap(category, subcategorySlug) {
   const map = {};
   if (!category) return map;
-  const allGroups = [
-    ...(category.propertyGroups || []),
-    ...(category.subcategories || []).flatMap((s) => s.propertyGroups || []),
-  ];
-  for (const group of allGroups) {
+
+  // 1. Ana kategori alanlarını yükle
+  for (const group of category.propertyGroups || []) {
     for (const field of group.fields || []) {
       if (field.key && !map[field.key]) {
-        map[field.key] = {
-          label: field.label || field.key,
-          icon: field.icon || "",
-          unit: field.unit || "",
-          type: field.type || "text",
-          required: field.required === true,
-          showOnCard: field.showOnCard === true,
-          quickView: field.quickView === true || field.showOnQuickView === true,
-          groupKey: group.key,
-          groupLabel: group.name,
-          options: Array.isArray(field.options) ? field.options : [],
-        };
+        map[field.key] = fieldToMeta(field, group);
       }
     }
   }
+
+  // 2. Eşleşen subcategory'nin alanları ana kategorinin üzerine yazar (override)
+  const matchedSub = subcategorySlug
+    ? (category.subcategories || []).find(
+        (s) => s.slug === subcategorySlug || s.name === subcategorySlug,
+      )
+    : null;
+
+  for (const group of matchedSub?.propertyGroups || []) {
+    for (const field of group.fields || []) {
+      if (field.key) {
+        map[field.key] = fieldToMeta(field, group);
+      }
+    }
+  }
+
   return map;
 }
 
@@ -95,8 +124,11 @@ function formatPropertyGroupsFull(rawValues, fieldMap) {
 /** Mongoose belgesi veya düz obje; agent + category populate edilmiş olmalı */
 function formatListingDetailPublic(listing) {
   const doc = listing.toObject ? listing.toObject() : listing;
-  const cover = doc.images?.find((img) => img.isCover) || doc.images?.[0];
-  const fieldMap = buildFieldMap(doc.category);
+  const images = normalizeListingImages(doc.images);
+  const coverImage = images.find((img) => img.isCover && img.type !== "video")
+    || images.find((img) => img.type !== "video")
+    || images[0];
+  const fieldMap = buildFieldMap(doc.category, doc.subcategory);
 
   return {
     id: doc._id?.toString(),
@@ -137,9 +169,10 @@ function formatListingDetailPublic(listing) {
     highlights: doc.highlights || [],
     badges: doc.badges || [],
 
-    cardImage: cover?.url ?? null,
-    heroImage: cover?.url ?? null,
-    gallery: doc.images?.map((img) => ({ url: img.url, alt: img.alt || "" })) || [],
+    cardImage: coverImage?.type !== "video" ? (coverImage?.url ?? null) : null,
+    heroImage: coverImage?.type !== "video" ? (coverImage?.url ?? null) : null,
+    images,
+    gallery: images,
     floorPlans: doc.floorPlans || [],
     documents: doc.documents || [],
     contentGallery: normalizeContentGallery(doc.contentGallery),
@@ -165,6 +198,7 @@ function formatListingDetailPublic(listing) {
 
 module.exports = {
   normalizeContentGallery,
+  normalizeListingImages,
   buildFieldMap,
   formatListingDetailPublic,
 };

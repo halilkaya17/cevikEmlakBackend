@@ -2,7 +2,7 @@ const express = require("express");
 const { Readable } = require("stream");
 const MediaAsset = require("../models/MediaAsset");
 const { requireAuth } = require("../middleware/auth");
-const { upload } = require("../middleware/upload");
+const { upload, IMAGE_SIZE_LIMIT, VIDEO_SIZE_LIMIT } = require("../middleware/upload");
 
 const router = express.Router();
 
@@ -72,6 +72,16 @@ router.post("/", requireAuth, upload.array("files", 20), async (req, res, next) 
     // ?save=false → sadece Cloudinary'e yükle, medya kütüphanesine kaydetme
     const saveToLibrary = req.query.save !== "false";
 
+    // Tür bazlı boyut kontrolü
+    for (const file of files) {
+      const isVideo = file.mimetype.startsWith("video/");
+      const limit = isVideo ? VIDEO_SIZE_LIMIT : IMAGE_SIZE_LIMIT;
+      if (file.size > limit) {
+        const mb = Math.round(limit / 1024 / 1024);
+        return res.status(400).json({ error: `${file.originalname}: maksimum dosya boyutu ${mb} MB` });
+      }
+    }
+
     const assetDocs = await Promise.all(
       files.map(async (file) => {
         let url;
@@ -88,6 +98,7 @@ router.post("/", requireAuth, upload.array("files", 20), async (req, res, next) 
           mimeType: file.mimetype,
           size: file.size,
           kind: mediaKind(file.mimetype || ""),
+          type: file.mimetype.startsWith("video/") ? "video" : "image",
         };
       }),
     );

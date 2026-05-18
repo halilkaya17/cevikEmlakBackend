@@ -1,6 +1,31 @@
 const Listing = require("../models/Listing");
 const { formatListingDetailPublic } = require("./listingDetailFormat");
 
+/**
+ * locations → cards (location-list) bloğundaki her kartın count değerini
+ * gerçek ilan sayısıyla günceller. neighborhood varsa onu da filtreler.
+ */
+async function enrichHomePageLocationCounts(normalizedPage) {
+  if (!normalizedPage || normalizedPage.pageKey !== "home") return normalizedPage;
+
+  const locSection = normalizedPage.sections?.find((s) => s.key === "locations");
+  const cardsBlock = locSection?.blocks?.find((b) => b.key === "cards" && b.type === "location-list");
+  if (!cardsBlock || !Array.isArray(cardsBlock.value) || cardsBlock.value.length === 0) return normalizedPage;
+
+  cardsBlock.value = await Promise.all(
+    cardsBlock.value.map(async (card) => {
+      const q = { active: true, status: "published" };
+      if (card.city?.trim()) q.city = card.city.trim();
+      if (card.district?.trim()) q.district = card.district.trim();
+      if (card.neighborhood?.trim()) q.neighborhood = { $regex: card.neighborhood.trim(), $options: "i" };
+      const count = await Listing.countDocuments(q);
+      return { ...card, count };
+    }),
+  );
+
+  return normalizedPage;
+}
+
 function pickListingForRef(docs, ref) {
   const s = String(ref ?? "").trim();
   if (!s) return null;
@@ -40,11 +65,22 @@ async function enrichHomePageFeaturedListings(normalizedPage) {
 
   block.value = block.value.map((row) => {
     const chosen = pickListingForRef(listings, row?.listingId);
-    const listing = chosen ? formatListingDetailPublic(chosen) : null;
-    return { ...row, listing };
+    if (!chosen) return { ...row, listing: null };
+
+    const full = formatListingDetailPublic(chosen);
+
+    // Ana sayfada sadece showOnCard && quickView olan özellikler yeterli
+    const propertyGroups = full.propertyGroups
+      .map((group) => ({
+        ...group,
+        properties: group.properties.filter((p) => p.showOnCard && p.quickView),
+      }))
+      .filter((group) => group.properties.length > 0);
+
+    return { ...row, listing: { ...full, propertyGroups } };
   });
 
   return normalizedPage;
 }
 
-module.exports = { enrichHomePageFeaturedListings };
+module.exports = { enrichHomePageFeaturedListings, enrichHomePageLocationCounts };
