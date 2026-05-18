@@ -108,7 +108,7 @@ router.get("/", requireAuth, async (_req, res, next) => {
         price:        doc.price,
         categorySlug: doc.categorySlug,
         viewCount:    doc.viewCount || 0,
-        cardImage:    cover?.url || "/ilan-mini-resim.png",
+        cardImage:    cover?.url ?? null,
         agent:        doc.agent ? {
           name:  [doc.agent.firstName, doc.agent.lastName].filter(Boolean).join(" ") || doc.agent.name || "",
           photo: doc.agent.photo || "",
@@ -145,7 +145,7 @@ router.get("/", requireAuth, async (_req, res, next) => {
           price:        l.price,
           categorySlug: l.categorySlug,
           viewCount:    l.viewCount || 0,
-          cardImage:    cover?.url || "/ilan-mini-resim.png",
+          cardImage:    cover?.url ?? null,
         };
       }),
       categoryBreakdown: categoryBreakdown.map((row) => ({

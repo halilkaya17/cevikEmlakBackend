@@ -149,6 +149,8 @@ app.use(`${API_PREFIX}/cloudinary`, require("./routes/cloudinary"));
 app.use(`${API_PREFIX}/admin-users`, require("./routes/adminUsers"));
 app.use(`${API_PREFIX}/docs`, require("./routes/docs"));
 app.use(`${API_PREFIX}/icons`, require("./routes/icons"));
+app.use(`${API_PREFIX}/locations`, require("./routes/locations"));
+app.use(`${API_PREFIX}/messages`, require("./routes/messages"));
 app.use(`${API_PREFIX}/search-request`, require("./routes/searchRequest"));
 
 app.use((req, res) => {

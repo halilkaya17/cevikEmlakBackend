@@ -24,8 +24,8 @@ function formatListing(listing) {
     ...doc,
     propertyValues,
     id: doc._id?.toString(),
-    cardImage: cover?.url || "/ilan-mini-resim.png",
-    heroImage: cover?.url || "/urun-ana.png",
+    cardImage: cover?.url ?? null,
+    heroImage: cover?.url ?? null,
     gallery: doc.images?.map((img) => img.url) || [],
     districtText: [doc.city, doc.district].filter(Boolean).join("/"),
     detailLocation: [doc.city, doc.district, doc.neighborhood].filter(Boolean).join(" / "),
@@ -287,7 +287,7 @@ router.get("/cards", async (req, res, next) => {
         areaGross:       doc.areaGross || null,
         rooms:           doc.rooms || "",
         badges:          doc.badges || [],
-        cardImage:       cover?.url || "/ilan-mini-resim.png",
+        cardImage:       cover?.url ?? null,
         agent: {
           name:   doc.agent?.name || [doc.agent?.firstName, doc.agent?.lastName].filter(Boolean).join(" ") || "",
           phones: doc.agent?.phones || [],
@@ -364,7 +364,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       categorySlug: category.slug,
       publishedAt: req.body.status === "published" ? new Date() : null,
     });
-    res.status(201).json({ listing });
+    res.status(201).json({ listing: formatListing(listing) });
   } catch (error) {
     next(error);
   }
@@ -389,7 +389,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       runValidators: true,
     });
     if (!listing) return res.status(404).json({ message: "Ilan bulunamadi" });
-    return res.json({ listing });
+    return res.json({ listing: formatListing(listing) });
   } catch (error) {
     return next(error);
   }

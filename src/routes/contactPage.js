@@ -14,9 +14,7 @@ function emptyDoc() {
     fax: "",
     email: "",
     address: "",
-    mapLatitude: null,
-    mapLongitude: null,
-    mapZoom: 15,
+    mapUrl: "",
   };
 }
 
@@ -44,16 +42,11 @@ router.get("/", async (_req, res, next) => {
 
 function sanitizeBody(body) {
   const out = { ...emptyDoc(), ...body };
-  const parseCoord = (v) => {
-    if (v === "" || v === null || v === undefined) return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-  out.mapLatitude = parseCoord(body.mapLatitude);
-  out.mapLongitude = parseCoord(body.mapLongitude);
-  const z = parseCoord(body.mapZoom);
-  out.mapZoom = z != null ? Math.min(21, Math.max(1, Math.round(z))) : 15;
+  out.mapUrl = typeof body.mapUrl === "string" ? body.mapUrl.trim() : "";
   delete out.social;
+  delete out.mapLatitude;
+  delete out.mapLongitude;
+  delete out.mapZoom;
   return out;
 }
 

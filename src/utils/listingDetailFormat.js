@@ -137,8 +137,8 @@ function formatListingDetailPublic(listing) {
     highlights: doc.highlights || [],
     badges: doc.badges || [],
 
-    cardImage: cover?.url || "/ilan-mini-resim.png",
-    heroImage: cover?.url || "/urun-ana.png",
+    cardImage: cover?.url ?? null,
+    heroImage: cover?.url ?? null,
     gallery: doc.images?.map((img) => ({ url: img.url, alt: img.alt || "" })) || [],
     floorPlans: doc.floorPlans || [],
     documents: doc.documents || [],
