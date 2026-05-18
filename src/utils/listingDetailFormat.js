@@ -150,6 +150,8 @@ function formatListingDetailPublic(listing) {
       firstName: doc.agent?.firstName || "",
       lastName: doc.agent?.lastName || "",
       title: doc.agent?.title || "",
+      mobilePhone: doc.agent?.mobilePhone || "",
+      officePhone: doc.agent?.officePhone || "",
       phones: doc.agent?.phones || [],
       email: doc.agent?.email || "",
       photo: doc.agent?.photo || "",
