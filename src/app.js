@@ -152,6 +152,7 @@ app.use(`${API_PREFIX}/icons`, require("./routes/icons"));
 app.use(`${API_PREFIX}/locations`, require("./routes/locations"));
 app.use(`${API_PREFIX}/messages`, require("./routes/messages"));
 app.use(`${API_PREFIX}/search-request`, require("./routes/searchRequest"));
+app.use(`${API_PREFIX}/geometry`, require("./routes/geometry"));
 
 app.use((req, res) => {
   applyCorsHeadersIfAllowed(req, res);

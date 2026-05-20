@@ -52,7 +52,6 @@ router.get("/", async (req, res, next) => {
     if (req.query.transactionType) query.transactionType = req.query.transactionType;
     if (req.query.city) query.city = req.query.city;
     if (req.query.district) query.district = req.query.district;
-    if (req.query.neighborhood) query.neighborhood = { $regex: req.query.neighborhood.trim(), $options: "i" };
     if (req.query.subcategory) query.subcategory = req.query.subcategory;
     if (req.query.rooms) query.rooms = req.query.rooms;
     if (req.query.q) {
@@ -203,7 +202,7 @@ function formatPropertyGroups(rawValues, fieldMap) {
 
   for (const [key, value] of Object.entries(obj)) {
     const meta = fieldMap[key];
-    if (!meta) continue;
+    if (!meta?.showOnCard) continue;
     if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) continue;
 
     if (!groupMap.has(meta.groupKey)) {
@@ -236,7 +235,6 @@ router.get("/cards", async (req, res, next) => {
     if (req.query.transactionType) query.transactionType = req.query.transactionType;
     if (req.query.city) query.city = req.query.city;
     if (req.query.district) query.district = req.query.district;
-    if (req.query.neighborhood) query.neighborhood = { $regex: req.query.neighborhood.trim(), $options: "i" };
     if (req.query.subcategory) query.subcategory = req.query.subcategory;
     if (req.query.rooms) query.rooms = req.query.rooms;
     if (req.query.q) {
@@ -287,7 +285,7 @@ router.get("/cards", async (req, res, next) => {
     const cards = listings.map((listing) => {
       const doc      = listing.toObject ? listing.toObject() : listing;
       const cover    = doc.images?.find((img) => img.isCover) || doc.images?.[0];
-      const fieldMap = buildFieldMap(doc.category, doc.subcategory);
+      const fieldMap = buildFieldMap(doc.category);
 
       return {
         id:              doc._id?.toString(),
@@ -308,11 +306,6 @@ router.get("/cards", async (req, res, next) => {
         rooms:           doc.rooms || "",
         badges:          doc.badges || [],
         cardImage:       cover?.url ?? null,
-        summary:         doc.summary || "",
-        images: (doc.images || []).map((img) => ({
-          url: img.url,
-          type: img.type || "image",
-        })),
         agent: {
           name:   doc.agent?.name || [doc.agent?.firstName, doc.agent?.lastName].filter(Boolean).join(" ") || "",
           phones: doc.agent?.phones || [],

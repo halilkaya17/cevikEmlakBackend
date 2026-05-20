@@ -19,7 +19,6 @@ const contactPageSchema = new mongoose.Schema(
     email: { type: String, default: "" },
     address: { type: String, default: "" },
     mapUrl: { type: String, default: "" },
-    workingHours: { type: String, default: "" },
     social: [socialLinkSchema],
   },
   { timestamps: true },
