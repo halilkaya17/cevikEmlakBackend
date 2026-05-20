@@ -9,9 +9,7 @@ const router = express.Router();
 const CORE_ROOT_CATEGORY_SLUGS = new Set(["konut", "isyeri", "is-yeri", "arsa", "proje"]);
 
 const requiredCoreFields = [
-  { key: "oda_sayisi", label: "Oda Sayısı", type: "text", unit: "", required: false, showOnCard: true, quickView: false, options: [] },
-  { key: "salon_sayisi", label: "Salon Sayısı", type: "text", unit: "", required: false, showOnCard: false, quickView: false, options: [] },
-  { key: "banyo_sayisi", label: "Banyo Sayısı", type: "text", unit: "", required: false, showOnCard: false, quickView: false, options: [] },
+  { key: "oda-sayisi", label: "Oda Sayısı", type: "text", unit: "", required: false, showOnCard: true, quickView: false, options: [] },
 ];
 
 /** "oda_sayisi" ve "oda-sayisi" gibi tire/alt çizgi farklarını eşit say */
@@ -83,24 +81,47 @@ function ensureCoreFields(propertyGroups = []) {
   });
 }
 
+/** alan-yeni-* veya grup-yeni-* pattern'ı tanır */
+function isAutoKey(key) {
+  return /^(alan|grup)-yeni-\d+$/.test(key || "");
+}
+
+/** label'dan slug üretir: "Brüt m²" → "brut-m2" */
+function generateKey(label) {
+  return toSlug(label || "alan");
+}
+
 function normalizePropertyGroups(propertyGroups = []) {
-  return (propertyGroups || []).map((group) => ({
-    ...group,
-    fields: (group.fields || []).map((field) => {
-      const quickView =
-        field.quickView === true ||
-        field.showOnQuickView === true ||
-        field.quickPreview === true ||
-        field.quick_preview === true ||
-        field.hizliGoruntule === true;
-      return {
-        ...field,
-        required: field.required === true,
-        showOnCard: field.showOnCard === true,
-        quickView,
-      };
-    }),
-  }));
+  return (propertyGroups || []).map((group) => {
+    const groupKey = isAutoKey(group.key)
+      ? generateKey(group.name)
+      : group.key;
+
+    return {
+      ...group,
+      key: groupKey,
+      fields: (group.fields || []).map((field) => {
+        const quickView =
+          field.quickView === true ||
+          field.showOnQuickView === true ||
+          field.quickPreview === true ||
+          field.quick_preview === true ||
+          field.hizliGoruntule === true;
+
+        const fieldKey = isAutoKey(field.key)
+          ? generateKey(field.label)
+          : field.key;
+
+        return {
+          ...field,
+          key: fieldKey,
+          required: field.required === true,
+          showOnCard: field.showOnCard === true,
+          quickView,
+        };
+      }),
+    };
+  });
 }
 
 function mapQuickViewAliasesForResponse(propertyGroups = []) {
@@ -148,13 +169,17 @@ router.post("/", requireAuth, async (req, res, next) => {
     if (payload.propertyGroups !== undefined) {
       payload.propertyGroups = normalizePropertyGroups(payload.propertyGroups);
     }
+    const parentTemplate = payload.propertyGroups || [];
     if (Array.isArray(payload.subcategories)) {
-      payload.subcategories = payload.subcategories.map((item) => ({
-        ...item,
-        name: item.name,
-        slug: item.slug || toSlug(item.name),
-        propertyGroups: normalizePropertyGroups(item.propertyGroups || []),
-      }));
+      payload.subcategories = payload.subcategories.map((item) => {
+        const hasGroups = Array.isArray(item.propertyGroups) && item.propertyGroups.length > 0;
+        return {
+          ...item,
+          name: item.name,
+          slug: item.slug || toSlug(item.name),
+          propertyGroups: normalizePropertyGroups(hasGroups ? item.propertyGroups : parentTemplate),
+        };
+      });
     }
     const tplErr = validateSubcategoriesPreserveTemplate(payload.propertyGroups, payload.subcategories);
     if (tplErr) return res.status(400).json({ message: tplErr });
@@ -175,17 +200,23 @@ router.put("/:id", requireAuth, async (req, res, next) => {
     if (payload.propertyGroups !== undefined) {
       payload.propertyGroups = normalizePropertyGroups(payload.propertyGroups);
     }
+
+    const parentTemplate =
+      payload.propertyGroups !== undefined ? payload.propertyGroups : (existing.propertyGroups || []);
+
     if (Array.isArray(payload.subcategories)) {
-      payload.subcategories = payload.subcategories.map((item) => ({
-        ...item,
-        name: item.name,
-        slug: item.slug || toSlug(item.name),
-        propertyGroups: normalizePropertyGroups(item.propertyGroups || []),
-      }));
+      payload.subcategories = payload.subcategories.map((item) => {
+        const hasGroups = Array.isArray(item.propertyGroups) && item.propertyGroups.length > 0;
+        return {
+          ...item,
+          name: item.name,
+          slug: item.slug || toSlug(item.name),
+          propertyGroups: normalizePropertyGroups(hasGroups ? item.propertyGroups : parentTemplate),
+        };
+      });
     }
 
-    const template =
-      payload.propertyGroups !== undefined ? payload.propertyGroups : existing.propertyGroups;
+    const template = parentTemplate;
     const subsToCheck =
       payload.subcategories !== undefined ? payload.subcategories : existing.subcategories;
     const tplErr = validateSubcategoriesPreserveTemplate(template, subsToCheck);

@@ -53,7 +53,7 @@ router.get("/", async (req, res, next) => {
     if (req.query.city) query.city = req.query.city;
     if (req.query.district) query.district = req.query.district;
     if (req.query.subcategory) query.subcategory = req.query.subcategory;
-    if (req.query.rooms) query.rooms = req.query.rooms;
+    if (req.query.rooms) query["propertyValues.oda-sayisi"] = req.query.rooms.replace(/ /g, "+");
     if (req.query.q) {
       const q = req.query.q.trim();
       query.$or = [
@@ -70,9 +70,9 @@ router.get("/", async (req, res, next) => {
       if (req.query.priceMax) query.price.$lte = Number(req.query.priceMax || 0);
     }
     if (req.query.areaMin || req.query.areaMax) {
-      query.areaNet = {};
-      if (req.query.areaMin) query.areaNet.$gte = Number(req.query.areaMin || 0);
-      if (req.query.areaMax) query.areaNet.$lte = Number(req.query.areaMax || 0);
+      query["propertyValues.net-m2"] = {};
+      if (req.query.areaMin) query["propertyValues.net-m2"].$gte = Number(req.query.areaMin || 0);
+      if (req.query.areaMax) query["propertyValues.net-m2"].$lte = Number(req.query.areaMax || 0);
     }
 
     const page = Math.max(1, Number(req.query.page || 1));
@@ -83,8 +83,8 @@ router.get("/", async (req, res, next) => {
       "price-asc": { price: 1, publishedAt: -1, createdAt: -1 },
       newest: { publishedAt: -1, createdAt: -1 },
       oldest: { publishedAt: 1, createdAt: 1 },
-      "area-desc": { areaNet: -1, areaGross: -1, publishedAt: -1 },
-      "area-asc": { areaNet: 1, areaGross: 1, publishedAt: -1 },
+      "area-desc": { "propertyValues.net-m2": -1, publishedAt: -1 },
+      "area-asc": { "propertyValues.net-m2": 1, publishedAt: -1 },
     };
     const sort = sortMap[req.query.sortBy] || sortMap.newest;
 
@@ -100,8 +100,9 @@ router.get("/", async (req, res, next) => {
 
     const optionsQuery = { ...query };
     delete optionsQuery.price;
-    delete optionsQuery.areaNet;
+    delete optionsQuery["propertyValues.net-m2"];
     delete optionsQuery.$text;
+    delete optionsQuery["propertyValues.oda-sayisi"];
 
     const [subcategoryRows, locationRows, roomRows, priceBoundsRows] = await Promise.all([
       Listing.aggregate([
@@ -118,8 +119,8 @@ router.get("/", async (req, res, next) => {
       ]),
       Listing.aggregate([
         { $match: optionsQuery },
-        { $group: { _id: "$rooms" } },
-        { $match: { _id: { $ne: "", $ne: null } } },
+        { $group: { _id: "$propertyValues.oda-sayisi" } },
+        { $match: { _id: { $ne: null, $exists: true } } },
         { $sort: { _id: 1 } },
       ]),
       Listing.aggregate([
@@ -236,7 +237,7 @@ router.get("/cards", async (req, res, next) => {
     if (req.query.city) query.city = req.query.city;
     if (req.query.district) query.district = req.query.district;
     if (req.query.subcategory) query.subcategory = req.query.subcategory;
-    if (req.query.rooms) query.rooms = req.query.rooms;
+    if (req.query.rooms) query["propertyValues.oda-sayisi"] = req.query.rooms.replace(/ /g, "+");
     if (req.query.q) {
       const q = req.query.q.trim();
       query.$or = [
@@ -253,9 +254,9 @@ router.get("/cards", async (req, res, next) => {
       if (req.query.priceMax) query.price.$lte = Number(req.query.priceMax);
     }
     if (req.query.areaMin || req.query.areaMax) {
-      query.areaNet = {};
-      if (req.query.areaMin) query.areaNet.$gte = Number(req.query.areaMin);
-      if (req.query.areaMax) query.areaNet.$lte = Number(req.query.areaMax);
+      query["propertyValues.net-m2"] = {};
+      if (req.query.areaMin) query["propertyValues.net-m2"].$gte = Number(req.query.areaMin);
+      if (req.query.areaMax) query["propertyValues.net-m2"].$lte = Number(req.query.areaMax);
     }
 
     const page  = Math.max(1, Number(req.query.page  || 1));
@@ -306,6 +307,8 @@ router.get("/cards", async (req, res, next) => {
         rooms:           doc.rooms || "",
         badges:          doc.badges || [],
         cardImage:       cover?.url ?? null,
+        images:          doc.images || [],
+        gallery:         doc.images?.map((img) => img.url) || [],
         agent: {
           name:   doc.agent?.name || [doc.agent?.firstName, doc.agent?.lastName].filter(Boolean).join(" ") || "",
           phones: doc.agent?.phones || [],

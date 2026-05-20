@@ -12,6 +12,7 @@ const HOME_PAGE_TEMPLATE = {
         { key: "backgroundImage", label: "1. Slider Medyasi", type: "media", value: "/slider1.png" },
         { key: "backgroundImageSecond", label: "2. Slider Medyasi", type: "media", value: "/slider1.png" },
         { key: "topImage", label: "Baslik Ic Gorseli", type: "image", value: "/slider-ustu.png" },
+        { key: "category-icons", label: "Kategori Ikonlari", type: "json", value: { satilik: "", kiralik: "", projeler: "" } },
       ],
     },
     {
@@ -127,6 +128,19 @@ function sanitizeFeaturedProjectListItems(value) {
   });
 }
 
+function parseJsonValue(value, fallback) {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 function normalizeBlockValue(templateBlock, value) {
   const listTypes = new Set(["stat-list", "string-list", "metric-list", "accordion-list", "location-list", "blog-featured-list", "blog-side-list", "featured-project-list"]);
   if (listTypes.has(templateBlock.type)) {
@@ -135,6 +149,9 @@ function normalizeBlockValue(templateBlock, value) {
       return [...parsed, ...templateBlock.value.slice(parsed.length)];
     }
     return parsed;
+  }
+  if (templateBlock.type === "json") {
+    return parseJsonValue(value, templateBlock.value);
   }
   return value;
 }
