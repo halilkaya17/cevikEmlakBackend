@@ -90,6 +90,5 @@ const listingSchema = new mongoose.Schema(
 );
 
 listingSchema.index({ title: "text", city: "text", district: "text", summary: "text" });
-listingSchema.index({ listingNo: 1 });
 
 module.exports = mongoose.model("Listing", listingSchema);

@@ -274,7 +274,7 @@ router.get("/cards", async (req, res, next) => {
 
     const [listings, total] = await Promise.all([
       Listing.find(query)
-        .select("_id listingNo slug title transactionType status categorySlug subcategory price currency city district areaNet areaGross rooms badges images agent propertyValues publishedAt")
+        .select("_id listingNo slug title transactionType status categorySlug subcategory price currency city district areaNet areaGross rooms summary badges images agent propertyValues publishedAt")
         .populate("agent", "name firstName lastName phones photo")
         .populate("category", "name slug propertyGroups subcategories")
         .sort(sort)
@@ -305,6 +305,7 @@ router.get("/cards", async (req, res, next) => {
         areaNet:         doc.areaNet  || null,
         areaGross:       doc.areaGross || null,
         rooms:           doc.rooms || "",
+        summary:         doc.summary || "",
         badges:          doc.badges || [],
         cardImage:       cover?.url ?? null,
         images:          doc.images || [],

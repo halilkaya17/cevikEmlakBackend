@@ -13,6 +13,4 @@ const iconSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-iconSchema.index({ key: 1 }, { unique: true });
-
 module.exports = mongoose.model("Icon", iconSchema);
