@@ -100,6 +100,20 @@ function mapLegacyAboutBlocks(blocks = []) {
   };
 }
 
+/** slider-list slaytlarında imageMobile yoksa boş string ekle; diğer alanlara dokunma */
+function ensureSliderSlidesImageMobile(blocks) {
+  return (blocks || []).map((block) => {
+    if (block.type !== "slider-list" || !Array.isArray(block.value)) return block;
+    return {
+      ...block,
+      value: block.value.map((slide) => {
+        if (!slide || typeof slide !== "object") return slide;
+        return { ...slide, imageMobile: slide.imageMobile ?? "" };
+      }),
+    };
+  });
+}
+
 function parseListValue(value, fallback) {
   if (Array.isArray(value)) return value;
   if (typeof value === "string" && value.trim()) {
@@ -142,7 +156,7 @@ function parseJsonValue(value, fallback) {
 }
 
 function normalizeBlockValue(templateBlock, value) {
-  const listTypes = new Set(["stat-list", "string-list", "metric-list", "accordion-list", "location-list", "blog-featured-list", "blog-side-list", "featured-project-list"]);
+  const listTypes = new Set(["stat-list", "string-list", "metric-list", "accordion-list", "location-list", "blog-featured-list", "blog-side-list", "featured-project-list", "slider-list"]);
   if (listTypes.has(templateBlock.type)) {
     const parsed = parseListValue(value, templateBlock.value);
     if (templateBlock.type === "featured-project-list" && parsed.length < templateBlock.value.length) {
@@ -169,10 +183,12 @@ function normalizeHomePage(page) {
   next.sections = next.sections.map((templateSection) => {
     const sourceSection = sourceSections.get(templateSection.key);
 
-    // Slider bölümü: slider-list bloku varsa olduğu gibi koru, template'e ezme
+    // Slider bölümü: slider-list varsa DB/CMS verisini koru (image + imageMobile vb.)
     if (templateSection.key === "slider" && sourceSection) {
       const hasSliderList = (sourceSection.blocks || []).some((b) => b.type === "slider-list");
-      if (hasSliderList) return sourceSection;
+      if (hasSliderList) {
+        return { ...sourceSection, blocks: ensureSliderSlidesImageMobile(sourceSection.blocks) };
+      }
     }
 
     const legacySlider = mapLegacySliderBlocks(sourceSections.get("slider")?.blocks || []);

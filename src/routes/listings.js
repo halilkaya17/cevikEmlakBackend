@@ -53,6 +53,7 @@ router.get("/", async (req, res, next) => {
     if (req.query.city) query.city = req.query.city;
     if (req.query.district) query.district = req.query.district;
     if (req.query.subcategory) query.subcategory = req.query.subcategory;
+    if (req.query.agent) query.agent = req.query.agent;
     if (req.query.rooms) query["propertyValues.oda-sayisi"] = req.query.rooms.replace(/ /g, "+");
     if (req.query.q) {
       const q = req.query.q.trim();

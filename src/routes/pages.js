@@ -3,6 +3,7 @@ const PageContent = require("../models/PageContent");
 const { requireAuth } = require("../middleware/auth");
 const { normalizeHomePage, HOME_PAGE_TEMPLATE } = require("../utils/homePage");
 const { normalizeHakkimizdaPage, HAKKIMIZDA_PAGE_TEMPLATE } = require("../utils/hakkimizdaPage");
+const { normalizeBlogPage, BLOG_PAGE_TEMPLATE } = require("../utils/blogPage");
 const { normalizeGeneralSettings, GENERAL_SETTINGS_TEMPLATE, maskMailSecretsForPublic, preserveSmtpPasswordIfEmpty } = require("../utils/generalSettings");
 const { enrichHomePageFeaturedListings, enrichHomePageLocationCounts } = require("../utils/homeFeaturedListings");
 
@@ -12,6 +13,8 @@ const router = express.Router();
 const PAGE_DEFAULTS = {
   home: HOME_PAGE_TEMPLATE,
   hakkimizda: HAKKIMIZDA_PAGE_TEMPLATE,
+  bloglar: BLOG_PAGE_TEMPLATE,
+  blog: { ...BLOG_PAGE_TEMPLATE, pageKey: "blog", title: "Blog" },
   "genel-ayarlar": GENERAL_SETTINGS_TEMPLATE,
   sertifikalar: {
     pageKey: "sertifikalar",
@@ -33,6 +36,7 @@ function normalizePage(page) {
   const source = page.toObject ? page.toObject() : page;
   if (source.pageKey === "home") return normalizeHomePage(source);
   if (source.pageKey === "hakkimizda") return normalizeHakkimizdaPage(source);
+  if (source.pageKey === "bloglar" || source.pageKey === "blog") return normalizeBlogPage(source);
   if (source.pageKey === "genel-ayarlar") return normalizeGeneralSettings(source);
   return source;
 }
@@ -47,6 +51,9 @@ function normalizePagePublic(page) {
 function normalizePayload(pageKey, payload) {
   if (pageKey === "home") return normalizeHomePage({ ...HOME_PAGE_TEMPLATE, ...payload, pageKey: "home" });
   if (pageKey === "hakkimizda") return normalizeHakkimizdaPage({ ...HAKKIMIZDA_PAGE_TEMPLATE, ...payload, pageKey: "hakkimizda" });
+  if (pageKey === "bloglar" || pageKey === "blog") {
+    return normalizeBlogPage({ ...BLOG_PAGE_TEMPLATE, ...payload, pageKey });
+  }
   if (pageKey === "genel-ayarlar") return normalizeGeneralSettings({ ...GENERAL_SETTINGS_TEMPLATE, ...payload, pageKey: "genel-ayarlar" });
   return payload;
 }

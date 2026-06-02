@@ -8,6 +8,7 @@ const BlogPost = require("./models/BlogPost");
 const Category = require("./models/Category");
 const Listing = require("./models/Listing");
 const PageContent = require("./models/PageContent");
+const { BLOG_PAGE_TEMPLATE } = require("./utils/blogPage");
 
 const iconLibrary = {
   apartment:
@@ -851,6 +852,12 @@ async function seed() {
         },
       ],
     } },
+    { upsert: true },
+  );
+
+  await PageContent.updateOne(
+    { pageKey: "bloglar" },
+    { $setOnInsert: BLOG_PAGE_TEMPLATE },
     { upsert: true },
   );
 
