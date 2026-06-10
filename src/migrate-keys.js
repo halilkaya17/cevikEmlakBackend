@@ -1,27 +1,12 @@
-/**
- * Migration: timestamp-tabanlı property key'lerini okunabilir slug'lara çevirir.
- *
- * Güncellenen koleksiyonlar:
- *   1. categories  → propertyGroups[].key, propertyGroups[].fields[].key
- *                    subcategories[].propertyGroups[].key, ...fields[].key
- *   2. listings    → propertyValues Map key'leri
- *
- * Kullanım: node src/migrate-keys.js
- */
-
 require("dotenv").config();
 
 const mongoose = require("mongoose");
 const Category = require("./models/Category");
 const Listing  = require("./models/Listing");
 
-// ─── Key haritası ─────────────────────────────────────────────────────────────
-
 const KEY_MAP = {
-  // Grup key'leri
   "grup-yeni-1778585902390": "temel-ozellikler",
 
-  // Field key'leri
   "alan-yeni-1778585903724": "brut-m2",
   "alan-yeni-1778585976942": "net-m2",
   "alan-yeni-1778585996716": "oda-sayisi",
@@ -38,8 +23,6 @@ const KEY_MAP = {
 function mapKey(key) {
   return KEY_MAP[key] ?? key;
 }
-
-// ─── Category migration ───────────────────────────────────────────────────────
 
 function migrateGroups(groups) {
   return (groups || []).map((group) => ({
@@ -64,13 +47,11 @@ async function migrateCategories() {
       propertyGroups: migrateGroups(sub.propertyGroups),
     }));
 
-    // Değişiklik var mı kontrol et
     const oldStr = JSON.stringify({ pg: cat.propertyGroups, sub: cat.subcategories });
     const newStr = JSON.stringify({ pg: newPropertyGroups,  sub: newSubcategories  });
 
     if (oldStr === newStr) continue;
 
-    // Key değişim sayısını say
     const oldKeys = (oldStr.match(/"key":"alan-yeni-|"key":"grup-yeni-/g) || []).length;
     keyChanges += oldKeys;
 
@@ -80,13 +61,10 @@ async function migrateCategories() {
     );
 
     updatedCount++;
-    console.log(`  ✓ Category güncellendi: "${cat.name}" (${cat.slug})`);
   }
 
   return { updatedCount, keyChanges };
 }
-
-// ─── Listing migration ────────────────────────────────────────────────────────
 
 async function migrateListings() {
   const listings = await Listing.find({}).lean();
@@ -116,43 +94,24 @@ async function migrateListings() {
     );
 
     updatedCount++;
-    console.log(`  ✓ Listing güncellendi: "${listing.title}" (${listing.listingNo})`);
   }
 
   return { updatedCount, keyChanges };
 }
 
-// ─── Ana akış ─────────────────────────────────────────────────────────────────
-
 async function run() {
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error("MONGODB_URI tanımlı değil");
 
-  console.log("MongoDB'ye bağlanılıyor...");
   await mongoose.connect(uri);
-  console.log("Bağlantı kuruldu.\n");
 
-  // ── Categories ──
-  console.log("=== CATEGORIES migrasyonu başlıyor ===");
   const catResult = await migrateCategories();
-  console.log(`\nCategories: ${catResult.updatedCount} belge güncellendi, ${catResult.keyChanges} key değiştirildi.\n`);
 
-  // ── Listings ──
-  console.log("=== LISTINGS migrasyonu başlıyor ===");
   const listResult = await migrateListings();
-  console.log(`\nListings: ${listResult.updatedCount} belge güncellendi, ${listResult.keyChanges} key değiştirildi.\n`);
-
-  // ── Özet ──
-  console.log("=== ÖZET ===");
-  console.log(`Categories güncellenen: ${catResult.updatedCount}`);
-  console.log(`Listings güncellenen:   ${listResult.updatedCount}`);
-  console.log(`Toplam key değişimi:    ${catResult.keyChanges + listResult.keyChanges}`);
-  console.log("\nMigrasyon tamamlandı.");
 
   await mongoose.disconnect();
 }
 
 run().catch((err) => {
-  console.error("Migrasyon hatası:", err.message);
   process.exit(1);
 });

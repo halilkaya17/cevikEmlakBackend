@@ -1,16 +1,3 @@
-/**
- * Sertifika/doküman dosyalarını uploads/docs/{docId}/ altına taşır ve DB günceller.
- *
- * Kapsam (DocFile):
- *   url
- *
- * Kullanım:
- *   node src/migrate-doc-media-folders.js --dry-run
- *   node src/migrate-doc-media-folders.js --apply
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -139,7 +126,6 @@ function resolveNewUrl(oldUrl, docId, refCounts, cache) {
   const srcPath = absolutePathForRelative(rel);
   if (!fs.existsSync(srcPath)) {
     stats.missingFile++;
-    if (VERBOSE) console.log(`    [dosya yok] ${rel}`);
     cache.set(oldUrl, oldUrl);
     return oldUrl;
   }
@@ -151,7 +137,6 @@ function resolveNewUrl(oldUrl, docId, refCounts, cache) {
   const copy = (refCounts.get(rel) || 0) > 1;
 
   if (DRY_RUN) {
-    console.log(`    [dry-run] ${copy ? "kopyala" : "taşı"}: ${rel} → ${newRel}`);
   } else if (!fs.existsSync(destPath)) {
     transferFile(srcPath, destPath, copy);
   }
@@ -178,18 +163,12 @@ function stableStringify(value) {
 }
 
 async function run() {
-  console.log("Doküman dosyalarını docs/{id}/ altına taşıma");
-  console.log(`  mod         : ${DRY_RUN ? "dry-run" : "uygula"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}`);
-  console.log(`  hedef       : ${DOCS_DIR}\n`);
 
   await connectDatabase();
 
   const docs = await DocFile.find({});
-  console.log(`Toplam doküman: ${docs.length}\n`);
 
   const refCounts = buildRefCounts(docs);
-  console.log(`Benzersiz local dosya yolu: ${refCounts.size}\n`);
 
   for (const doc of docs) {
     stats.docsProcessed++;
@@ -203,12 +182,10 @@ async function run() {
 
     const label = doc.name || doc.originalName || doc._id;
     if (DRY_RUN) {
-      console.log(`[dry-run] DocFile ${doc._id} (${label})`);
       continue;
     }
 
     await DocFile.replaceOne({ _id: doc._id }, afterObj);
-    console.log(`✓ DocFile ${doc._id} (${label})`);
   }
 
   const legacyDir = path.join(UPLOAD_DIR, "cevik-emlak", "docs");
@@ -216,35 +193,20 @@ async function run() {
     const remaining = fs.readdirSync(legacyDir);
     if (remaining.length === 0) {
       fs.rmdirSync(legacyDir);
-      console.log("\nBoş kalan cevik-emlak/docs/ klasörü silindi.");
     } else if (remaining.length > 0) {
-      console.log(`\nNot: cevik-emlak/docs/ içinde ${remaining.length} dosya kaldı (DB'de referans yok olabilir).`);
     }
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`İşlenen doküman  : ${stats.docsProcessed}`);
-  console.log(`Güncellenen      : ${stats.docsUpdated}`);
-  console.log(`Güncellenen URL  : ${stats.urlsUpdated}`);
-  console.log(`Taşınan dosya    : ${stats.filesMoved}`);
-  console.log(`Kopyalanan dosya : ${stats.filesCopied}`);
-  console.log(`Zaten doğru klasör: ${stats.alreadyInPlace}`);
-  console.log(`Dosya bulunamadı : ${stats.missingFile}`);
-  console.log(`Cloudinary (atlandı): ${stats.skippedExternal}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek taşıma için: node src/migrate-doc-media-folders.js --apply");
   }
 
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

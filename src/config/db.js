@@ -21,10 +21,7 @@ async function connectDatabase() {
   mongoose.set("strictQuery", true);
   await mongoose.connect(uri);
 
-  const { host, name } = mongoose.connection;
-  console.log(`MongoDB bağlandı: ${host} / veritabanı: ${name} (${describeMongoTarget(uri)})`);
-
-  return mongoose.connection;
+  const { host, name } = mongoose.connection;return mongoose.connection;
 }
 
 module.exports = { connectDatabase };

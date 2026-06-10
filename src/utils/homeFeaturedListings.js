@@ -1,11 +1,5 @@
 const Listing = require("../models/Listing");
 const { formatListingDetailPublic } = require("./listingDetailFormat");
-
-/**
- * locations → cards (location-list) bloğundaki her kartın count değerini
- * gerçek ilan sayısıyla günceller. neighborhood varsa onu da filtreler.
- * Proje kategorisi hariç tutulur (ilan listesi /cards ile aynı mantık).
- */
 async function enrichHomePageLocationCounts(normalizedPage) {
   if (!normalizedPage || normalizedPage.pageKey !== "home") return normalizedPage;
 
@@ -42,11 +36,6 @@ function pickListingForRef(docs, ref) {
   if (byNo) return byNo;
   return docs.find((d) => String(d.slug) === s) || null;
 }
-
-/**
- * normalizeHomePage çıktısında featured → projects satırlarına,
- * GET /listings/detail/:id ile aynı yapıda `listing` ekler (bulunamazsa null).
- */
 async function enrichHomePageFeaturedListings(normalizedPage) {
   if (!normalizedPage || normalizedPage.pageKey !== "home") return normalizedPage;
 
@@ -74,7 +63,6 @@ async function enrichHomePageFeaturedListings(normalizedPage) {
 
     const full = formatListingDetailPublic(chosen);
 
-    // Ana sayfada sadece showOnCard && quickView olan özellikler yeterli
     const propertyGroups = full.propertyGroups
       .map((group) => ({
         ...group,

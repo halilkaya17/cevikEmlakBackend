@@ -22,7 +22,6 @@ function pickStr(v) {
   return String(v).trim();
 }
 
-/** POST /api/v1/search-request — site ziyaretcisi arama talebi (e-posta) */
 router.post("/", limiter, async (req, res, next) => {
   try {
     const fullName = pickStr(req.body.fullName ?? req.body.adSoyad ?? req.body.name);

@@ -5,10 +5,8 @@ const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
-/* Tüm route'lar auth gerektirir */
 router.use(requireAuth);
 
-/* ─── Listele ─── */
 router.get("/", async (_req, res, next) => {
   try {
     const users = await AdminUser.find().select("-passwordHash").sort({ createdAt: 1 });
@@ -18,7 +16,6 @@ router.get("/", async (_req, res, next) => {
   }
 });
 
-/* ─── Oluştur ─── */
 router.post("/", async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
@@ -43,7 +40,6 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-/* ─── Güncelle ─── */
 router.put("/:id", async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
@@ -65,10 +61,8 @@ router.put("/:id", async (req, res, next) => {
   }
 });
 
-/* ─── Sil ─── */
 router.delete("/:id", async (req, res, next) => {
   try {
-    /* Kendini silemesin */
     if (String(req.user?.id) === String(req.params.id)) {
       return res.status(400).json({ message: "Kendi hesabınızı silemezsiniz" });
     }

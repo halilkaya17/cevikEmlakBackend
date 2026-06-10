@@ -1,9 +1,4 @@
 const mongoose = require("mongoose");
-
-/**
- * Mahalle/köy sınır poligon verisi — geo_locations koleksiyonu.
- * baslik_ful formatı: "İl, İlçe, Mahalle/Köy"  (örn. "Bolu, Göynük, Ahmetbeyler Köyü")
- */
 const neighborhoodGeometrySchema = new mongoose.Schema(
   {
     gid:        { type: Number },

@@ -1,15 +1,3 @@
-/**
- * DB'deki /uploads/ URL'lerinin base kısmını PUBLIC_API_URL ile hizalar.
- * Migration localhost ile çalıştırıldıysa (http://localhost:5001/uploads/...)
- * production frontend görselleri yükleyemez — bu script düzeltir.
- *
- * Kullanım:
- *   node src/fix-uploads-base-url.js --dry-run
- *   node src/fix-uploads-base-url.js
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const mongoose = require("mongoose");
@@ -29,11 +17,9 @@ const VERBOSE = args.has("--verbose");
 
 const TARGET_BASE = (process.env.PUBLIC_API_URL || "").replace(/\/+$/, "");
 if (!TARGET_BASE) {
-  console.error("PUBLIC_API_URL .env içinde tanımlı olmalı (örn. https://api.cevikemlak.com)");
   process.exit(1);
 }
 
-/** http://localhost:5001/uploads/... veya başka host /uploads/ → hedef base */
 const UPLOADS_URL_RE = /https?:\/\/[^/]+\/uploads\//gi;
 
 const stats = { docsUpdated: 0, urlsFixed: 0 };
@@ -44,8 +30,7 @@ function fixUploadsUrl(value) {
   UPLOADS_URL_RE.lastIndex = 0;
   const fixed = value.replace(UPLOADS_URL_RE, `${TARGET_BASE}/uploads/`);
   if (fixed !== value) stats.urlsFixed++;
-  if (VERBOSE && fixed !== value) console.log(`    ${value}\n    → ${fixed}`);
-  return fixed;
+  if (VERBOSE && fixed !== value)return fixed;
 }
 
 function shouldRecurse(value) {
@@ -92,22 +77,16 @@ async function migrateModel(Model, label) {
     stats.docsUpdated++;
 
     if (DRY_RUN) {
-      console.log(`  [dry-run] ${label} ${doc._id}`);
       continue;
     }
 
     await Model.replaceOne({ _id: doc._id }, afterObj);
-    console.log(`  ✓ ${label} ${doc._id}`);
   }
 
   const fixedInModel = stats.urlsFixed - beforeCount;
-  console.log(`${label}: ${docs.length} kayıt | ${updated} doküman | ${fixedInModel} URL düzeltildi`);
 }
 
 async function run() {
-  console.log("Uploads base URL düzeltme");
-  console.log(`  mod          : ${DRY_RUN ? "dry-run" : "yaz"}`);
-  console.log(`  hedef base   : ${TARGET_BASE}\n`);
 
   await connectDatabase();
 
@@ -119,23 +98,16 @@ async function run() {
   await migrateModel(DocFile, "DocFile");
   await migrateModel(SssContent, "SssContent");
 
-  console.log("\n=== ÖZET ===");
-  console.log(`Güncellenen doküman : ${stats.docsUpdated}`);
-  console.log(`Düzeltilen URL      : ${stats.urlsFixed}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek güncelleme için: node src/fix-uploads-base-url.js");
   }
 
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

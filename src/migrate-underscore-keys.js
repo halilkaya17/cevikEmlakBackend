@@ -1,10 +1,3 @@
-/**
- * Migration: propertyGroups ve subcategories içindeki tüm
- * grup key'leri ve field key'lerindeki alt çizgileri (_) tireye (-) çevirir.
- *
- * Kullanım: node src/migrate-underscore-keys.js
- */
-
 require("dotenv").config();
 const mongoose = require("mongoose");
 const Category = require("./models/Category");
@@ -39,9 +32,7 @@ function patchGroups(groups) {
 }
 
 async function run() {
-  console.log("MongoDB'ye bağlanılıyor...");
   await mongoose.connect(process.env.MONGODB_URI);
-  console.log("Bağlantı kuruldu.\n");
 
   const categories = await Category.find({}).lean();
   let totalCats = 0;
@@ -71,7 +62,6 @@ async function run() {
       await Category.findByIdAndUpdate(cat._id, update);
       totalCats++;
 
-      // Değişimleri logla
       const allOld = [
         ...(cat.propertyGroups || []),
         ...(cat.subcategories || []).flatMap((s) => s.propertyGroups || []),
@@ -84,33 +74,23 @@ async function run() {
         const ng = allNew[i];
         if (!ng) return;
         if (g.key !== ng.key) {
-          console.log(`  Grup: "${g.key}" → "${ng.key}"`);
           totalKeys++;
         }
         (g.fields || []).forEach((f, j) => {
           const nf = (ng.fields || [])[j];
           if (nf && f.key !== nf.key) {
-            console.log(`    Alan: "${f.key}" → "${nf.key}"  (${f.label})`);
             totalKeys++;
           }
         });
       });
 
-      console.log(`✓ Güncellendi: ${cat.name}`);
     } else {
-      console.log(`  Atlandı:    ${cat.name}`);
     }
   }
 
-  console.log(`\n=== ÖZET ===`);
-  console.log(`Güncellenen kategori : ${totalCats}`);
-  console.log(`Düzeltilen key       : ${totalKeys}`);
-
   await mongoose.disconnect();
-  console.log("\nTamamlandı.");
 }
 
 run().catch((err) => {
-  console.error("Hata:", err);
   process.exit(1);
 });

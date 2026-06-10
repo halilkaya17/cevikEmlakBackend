@@ -1,17 +1,3 @@
-/**
- * MongoDB'deki Cloudinary URL'lerini indirilen local dosya yollarına çevirir.
- *
- * Eşleştirme: res.cloudinary.com URL → public_id → uploads/{public_id}.{format}
- * Yeni URL: {PUBLIC_API_URL}/uploads/{relative-path}
- *
- * Kullanım:
- *   node src/migrate-cloudinary-urls-to-local.js --dry-run
- *   node src/migrate-cloudinary-urls-to-local.js
- *   node src/migrate-cloudinary-urls-to-local.js --verbose
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -54,7 +40,6 @@ function isCloudinaryUrl(value) {
   return typeof value === "string" && /res\.cloudinary\.com/i.test(value);
 }
 
-/** URL path segmentlerindeki %C3%A7 gibi encoding'i çöz (diskte ç, ı vb. dosya adları). */
 function decodePublicIdSegments(publicId) {
   return publicId
     .split("/")
@@ -78,7 +63,6 @@ function isTransformSegment(segment) {
   return /^[a-z0-9]{1,4}_[^/]+(?:,[a-z0-9]{1,4}_[^/]+)*$/i.test(segment);
 }
 
-/** Cloudinary SDK v2'de public_id_from_url yok; URL'den public_id çıkar. */
 function extractPublicIdFromCloudinaryUrl(url) {
   try {
     const parts = new URL(url).pathname.split("/").filter(Boolean);
@@ -108,12 +92,10 @@ function formatFromCloudinaryUrl(url) {
     try {
       last = decodeURIComponent(last);
     } catch {
-      /* keep encoded */
     }
     const dot = last.lastIndexOf(".");
     if (dot > 0) return last.slice(dot + 1).toLowerCase();
   } catch {
-    /* ignore */
   }
   return "";
 }
@@ -163,8 +145,7 @@ function resolveCloudinaryUrl(url) {
   if (!publicId) {
     activeModelStats.unparsedPublicId++;
     stats.unparsedPublicId++;
-    if (VERBOSE) console.log(`    [public_id çıkarılamadı] ${url}`);
-    return url;
+    if (VERBOSE)return url;
   }
 
   const format = formatFromCloudinaryUrl(url);
@@ -178,9 +159,7 @@ function resolveCloudinaryUrl(url) {
   const newUrl = localUrlFromFile(localPath);
   if (newUrl !== url) {
     activeModelStats.urlsReplaced++;
-    stats.urlsReplaced++;
-    if (VERBOSE) console.log(`    ${url}\n    → ${newUrl}`);
-  }
+    stats.urlsReplaced++;}
   return newUrl;
 }
 
@@ -239,36 +218,19 @@ async function migrateModel(Model, label) {
     activeModelStats.docsUpdated++;
     stats.docsUpdated++;
 
-    if (DRY_RUN) {
-      console.log(`  [dry-run] ${label} ${doc._id}`);
-      continue;
+    if (DRY_RUN) {continue;
     }
 
-    await Model.replaceOne({ _id: doc._id }, afterObj);
-    console.log(`  ✓ ${label} ${doc._id}`);
-  }
+    await Model.replaceOne({ _id: doc._id }, afterObj);}
 
   const summary = {
     label,
     totalDocs: docs.length,
     ...activeModelStats,
   };
-  modelSummaries.push(summary);
+  modelSummaries.push(summary);}
 
-  console.log(
-    `${label}: ${summary.totalDocs} kayıt | ${summary.docsUpdated} doküman | ` +
-      `${summary.cloudinaryUrls} Cloudinary URL | ${summary.urlsReplaced} URL değişecek | ` +
-      `${summary.missingLocal} local dosya yok | ${summary.unparsedPublicId} public_id okunamadı`,
-  );
-}
-
-async function run() {
-  console.log("Cloudinary URL → local migration");
-  console.log(`  mod         : ${DRY_RUN ? "dry-run" : "yaz"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}`);
-  console.log(`  uploads     : ${UPLOAD_DIR}\n`);
-
-  if (!fs.existsSync(UPLOAD_DIR)) {
+async function run() {if (!fs.existsSync(UPLOAD_DIR)) {
     throw new Error(`uploads klasörü bulunamadı: ${UPLOAD_DIR}`);
   }
 
@@ -280,49 +242,21 @@ async function run() {
   await migrateModel(MediaAsset, "MediaAsset");
   await migrateModel(Agent, "Agent");
   await migrateModel(DocFile, "DocFile");
-  await migrateModel(SssContent, "SssContent");
-
-  console.log("\n=== ÖZET ===");
-  console.log(`Güncellenen doküman : ${stats.docsUpdated}`);
-  console.log(`Cloudinary URL      : ${stats.cloudinaryUrls}`);
-  console.log(`Değişecek URL       : ${stats.urlsReplaced}`);
-  console.log(`Local dosya yok     : ${stats.missingLocalFile.length}`);
-  console.log(`public_id okunamadı : ${stats.unparsedPublicId}`);
-
-  if (modelSummaries.length) {
-    console.log("\nKoleksiyon bazında:");
-    for (const row of modelSummaries) {
-      console.log(
-        `  ${row.label.padEnd(12)} doküman: ${String(row.docsUpdated).padStart(3)} | ` +
-          `Cloudinary URL: ${String(row.cloudinaryUrls).padStart(4)} | değişecek: ${String(row.urlsReplaced).padStart(4)}`,
-      );
-    }
+  await migrateModel(SssContent, "SssContent");if (modelSummaries.length) {for (const row of modelSummaries) {}
   }
 
-  if (stats.missingLocalFile.length) {
-    console.log("\nLocal karşılığı bulunamayan URL'ler (ilk 15):");
-    for (const item of stats.missingLocalFile.slice(0, 15)) {
-      console.log(`  - ${item.publicId}${item.format ? `.${item.format}` : ""}`);
-      if (VERBOSE) console.log(`    ${item.url}`);
-    }
-    if (stats.missingLocalFile.length > 15) {
-      console.log(`  ... ve ${stats.missingLocalFile.length - 15} kayıt daha`);
-    }
+  if (stats.missingLocalFile.length) {for (const item of stats.missingLocalFile.slice(0, 15)) {}
+    if (stats.missingLocalFile.length > 15) {}
   }
 
-  if (DRY_RUN) {
-    console.log("\nGerçek güncelleme için: node src/migrate-cloudinary-urls-to-local.js");
-  }
+  if (DRY_RUN) {}
 
   await mongoose.disconnect();
 }
 
-run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
-  try {
+run().catch(async (err) => {try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

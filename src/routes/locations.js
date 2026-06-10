@@ -2,23 +2,11 @@ const express = require("express");
 const Location = require("../models/Location");
 
 const router = express.Router();
-
-/**
- * GET /api/v1/locations
- *   → tüm iller  { type: "cities", list: [{ name }] }
- *
- * GET /api/v1/locations?city=Adana
- *   → ilçeler    { type: "districts", list: [{ name }] }
- *
- * GET /api/v1/locations?city=Adana&district=Aladağ
- *   → mahalleler { type: "neighbourhoods", list: [{ name }] }
- */
 router.get("/", async (req, res, next) => {
   try {
     const city     = req.query.city     ? String(req.query.city).trim()     : null;
     const district = req.query.district ? String(req.query.district).trim() : null;
 
-    // İller
     if (!city) {
       const list = await Location.aggregate([
         { $group: { _id: "$province_name" } },
@@ -30,7 +18,6 @@ router.get("/", async (req, res, next) => {
 
     const cityMatch = { $regex: `^${city}$`, $options: "i" };
 
-    // İlçeler
     if (!district) {
       const list = await Location.aggregate([
         { $match: { province_name: cityMatch } },
@@ -41,7 +28,6 @@ router.get("/", async (req, res, next) => {
       return res.json({ type: "districts", list });
     }
 
-    // Mahalleler
     const districtMatch = { $regex: `^${district}$`, $options: "i" };
     const docs = await Location.find(
       { province_name: cityMatch, district_name: districtMatch },

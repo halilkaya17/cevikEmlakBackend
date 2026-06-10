@@ -21,7 +21,6 @@ function formatIcon(icon) {
   };
 }
 
-/** GET /api/v1/icons — herkese açık */
 router.get("/", async (_req, res, next) => {
   try {
     const icons = await Icon.find().sort({ key: 1 }).select("-__v -createdAt -updatedAt");
@@ -32,7 +31,6 @@ router.get("/", async (_req, res, next) => {
   }
 });
 
-/** POST /api/v1/icons/seed — toplu upsert, admin */
 router.post("/seed", requireAuth, async (req, res, next) => {
   try {
     const items = Array.isArray(req.body.icons) ? req.body.icons : [];
@@ -62,7 +60,6 @@ router.post("/seed", requireAuth, async (req, res, next) => {
   }
 });
 
-/** POST /api/v1/icons — yeni ikon, admin */
 router.post("/", requireAuth, async (req, res, next) => {
   try {
     const { key, label, paths, stroke, viewBox, fillRule, rawSvgContent } = req.body;
@@ -91,7 +88,6 @@ router.post("/", requireAuth, async (req, res, next) => {
   }
 });
 
-/** PUT /api/v1/icons/:key — güncelle (key rename destekli), admin */
 router.put("/:key", requireAuth, async (req, res, next) => {
   try {
     const currentKey = decodeURIComponent(req.params.key);
@@ -134,7 +130,6 @@ router.put("/:key", requireAuth, async (req, res, next) => {
   }
 });
 
-/** DELETE /api/v1/icons/:key — sil, admin */
 router.delete("/:key", requireAuth, async (req, res, next) => {
   try {
     const key = decodeURIComponent(req.params.key);

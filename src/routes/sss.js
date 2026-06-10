@@ -5,7 +5,6 @@ const { reconcileMediaOnUpdate } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
-/** GET /api/v1/sss — herkese açık; tek doküman döner */
 router.get("/", async (_req, res, next) => {
   try {
     let doc = await SssContent.findOne();
@@ -18,7 +17,6 @@ router.get("/", async (_req, res, next) => {
   }
 });
 
-/** PUT /api/v1/sss — yetkili; tüm içeriği günceller */
 router.put("/", requireAuth, async (req, res, next) => {
   try {
     const { banner, categories } = req.body;

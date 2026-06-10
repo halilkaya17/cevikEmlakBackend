@@ -1,17 +1,3 @@
-/**
- * Blog medyalarını uploads/blogs/{blogId}/ altına taşır ve DB URL'lerini günceller.
- *
- * Kapsam (BlogPost):
- *   coverImage (banner/kapak), gallery[], descriptionHtml, content (HTML)
- *
- * Kullanım:
- *   node src/migrate-blog-media-folders.js --dry-run
- *   node src/migrate-blog-media-folders.js --apply
- *   node src/migrate-blog-media-folders.js --apply --verbose
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -164,7 +150,6 @@ function resolveNewUrl(oldUrl, blogId, refCounts, cache) {
   const srcPath = absolutePathForRelative(rel);
   if (!fs.existsSync(srcPath)) {
     stats.missingFile++;
-    if (VERBOSE) console.log(`    [dosya yok] ${rel}`);
     cache.set(oldUrl, oldUrl);
     return oldUrl;
   }
@@ -176,7 +161,6 @@ function resolveNewUrl(oldUrl, blogId, refCounts, cache) {
   const copy = (refCounts.get(rel) || 0) > 1;
 
   if (DRY_RUN) {
-    console.log(`    [dry-run] ${copy ? "kopyala" : "taşı"}: ${rel} → ${newRel}`);
   } else if (!fs.existsSync(destPath)) {
     transferFile(srcPath, destPath, copy);
   }
@@ -221,18 +205,12 @@ function stableStringify(value) {
 }
 
 async function run() {
-  console.log("Blog medyalarını blogs/{id}/ altına taşıma");
-  console.log(`  mod         : ${DRY_RUN ? "dry-run" : "uygula"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}`);
-  console.log(`  hedef       : ${BLOGS_DIR}\n`);
 
   await connectDatabase();
 
   const blogs = await BlogPost.find({});
-  console.log(`Toplam blog: ${blogs.length}\n`);
 
   const refCounts = buildRefCounts(blogs);
-  console.log(`Benzersiz local medya yolu: ${refCounts.size}\n`);
 
   for (const blog of blogs) {
     stats.blogsProcessed++;
@@ -245,37 +223,22 @@ async function run() {
     stats.blogsUpdated++;
 
     if (DRY_RUN) {
-      console.log(`[dry-run] Blog ${blog._id} (${blog.slug})`);
       continue;
     }
 
     await BlogPost.replaceOne({ _id: blog._id }, afterObj);
-    console.log(`✓ Blog ${blog._id} (${blog.slug})`);
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`İşlenen blog       : ${stats.blogsProcessed}`);
-  console.log(`Güncellenen blog   : ${stats.blogsUpdated}`);
-  console.log(`Güncellenen URL    : ${stats.urlsUpdated}`);
-  console.log(`Taşınan dosya      : ${stats.filesMoved}`);
-  console.log(`Kopyalanan dosya   : ${stats.filesCopied}`);
-  console.log(`Zaten doğru klasör : ${stats.alreadyInPlace}`);
-  console.log(`Dosya bulunamadı   : ${stats.missingFile}`);
-  console.log(`Cloudinary (atlandı): ${stats.skippedExternal}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek taşıma için: node src/migrate-blog-media-folders.js --apply");
   }
 
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

@@ -120,11 +120,6 @@ async function deleteMediaIfUnreferenced(pathOrUrl, globalKeys) {
 
   return true;
 }
-
-/**
- * Güncelleme sonrası eski dokümandan kalkan URL'leri temizler.
- * excludeModel + excludeId: güncellenen kayıt (yeni hali henüz DB'de).
- */
 async function reconcileMediaOnUpdate(oldDoc, newDoc, { excludeModel, excludeId } = {}) {
   if (!oldDoc) return { removed: 0 };
 
@@ -150,7 +145,6 @@ async function reconcileMediaOnUpdate(oldDoc, newDoc, { excludeModel, excludeId 
   return { removed };
 }
 
-/** Kayıt silinirken o kayda ait medyaları temizler */
 async function reconcileMediaOnDelete(doc, { excludeModel, excludeId } = {}) {
   if (!doc) return { removed: 0 };
 
@@ -171,7 +165,6 @@ async function reconcileMediaOnDelete(doc, { excludeModel, excludeId } = {}) {
   return { removed };
 }
 
-/** MediaAsset kütüphanesinden silme */
 async function deleteMediaAssetById(assetId) {
   const asset = await MediaAsset.findById(assetId).lean();
   if (!asset) return { deleted: false, reason: "not_found" };

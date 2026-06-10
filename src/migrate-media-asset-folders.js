@@ -1,16 +1,3 @@
-/**
- * MediaAsset medyalarını uploads/media/{assetId}/ altına taşır ve DB günceller.
- *
- * Kapsam (MediaAsset):
- *   url
- *
- * Kullanım:
- *   node src/migrate-media-asset-folders.js --dry-run
- *   node src/migrate-media-asset-folders.js --apply
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -131,7 +118,6 @@ function resolveNewUrl(oldUrl, assetId, refCounts, cache) {
   const srcPath = absolutePathForRelative(rel);
   if (!fs.existsSync(srcPath)) {
     stats.missingFile++;
-    if (VERBOSE) console.log(`    [dosya yok] ${rel}`);
     cache.set(oldUrl, oldUrl);
     return oldUrl;
   }
@@ -143,7 +129,6 @@ function resolveNewUrl(oldUrl, assetId, refCounts, cache) {
   const copy = (refCounts.get(rel) || 0) > 1;
 
   if (DRY_RUN) {
-    console.log(`    [dry-run] ${copy ? "kopyala" : "taşı"}: ${rel} → ${newRel}`);
   } else if (!fs.existsSync(destPath)) {
     transferFile(srcPath, destPath, copy);
   }
@@ -167,24 +152,17 @@ function stableStringify(value) {
 }
 
 async function run() {
-  console.log("MediaAsset medyalarını media/{id}/ altına taşıma");
-  console.log(`  mod         : ${DRY_RUN ? "dry-run" : "uygula"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}`);
-  console.log(`  hedef       : ${MEDIA_DIR}\n`);
 
   await connectDatabase();
 
   const assets = await MediaAsset.find({});
-  console.log(`Toplam MediaAsset: ${assets.length}\n`);
 
   if (!assets.length) {
-    console.log("Taşınacak MediaAsset yok.");
     await mongoose.disconnect();
     return;
   }
 
   const refCounts = buildRefCounts(assets);
-  console.log(`Benzersiz local medya yolu: ${refCounts.size}\n`);
 
   for (const asset of assets) {
     stats.assetsProcessed++;
@@ -198,37 +176,22 @@ async function run() {
 
     const label = asset.originalName || asset.fileName || asset._id;
     if (DRY_RUN) {
-      console.log(`[dry-run] MediaAsset ${asset._id} (${label})`);
       continue;
     }
 
     await MediaAsset.replaceOne({ _id: asset._id }, afterObj);
-    console.log(`✓ MediaAsset ${asset._id} (${label})`);
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`İşlenen asset     : ${stats.assetsProcessed}`);
-  console.log(`Güncellenen       : ${stats.assetsUpdated}`);
-  console.log(`Güncellenen URL   : ${stats.urlsUpdated}`);
-  console.log(`Taşınan dosya     : ${stats.filesMoved}`);
-  console.log(`Kopyalanan dosya  : ${stats.filesCopied}`);
-  console.log(`Zaten doğru klasör: ${stats.alreadyInPlace}`);
-  console.log(`Dosya bulunamadı  : ${stats.missingFile}`);
-  console.log(`Cloudinary (atlandı): ${stats.skippedExternal}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek taşıma için: node src/migrate-media-asset-folders.js --apply");
   }
 
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

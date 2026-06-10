@@ -100,7 +100,6 @@ function mapLegacyAboutBlocks(blocks = []) {
   };
 }
 
-/** slider-list slaytlarında imageMobile yoksa boş string ekle; diğer alanlara dokunma */
 function ensureSliderSlidesImageMobile(blocks) {
   return (blocks || []).map((block) => {
     if (block.type !== "slider-list" || !Array.isArray(block.value)) return block;
@@ -127,7 +126,6 @@ function parseListValue(value, fallback) {
   return fallback;
 }
 
-/** CMS satırı: kayıtta ve normalize çıktısında sadece bu alanlar kalır; tam ilan GET /pages/home ile `listing` olarak eklenir. */
 const FEATURED_PROJECT_ROW_KEYS = ["id", "listingId", "title", "description"];
 
 function sanitizeFeaturedProjectListItems(value) {
@@ -183,7 +181,6 @@ function normalizeHomePage(page) {
   next.sections = next.sections.map((templateSection) => {
     const sourceSection = sourceSections.get(templateSection.key);
 
-    // Slider bölümü: slider-list varsa DB/CMS verisini koru (image + imageMobile vb.)
     if (templateSection.key === "slider" && sourceSection) {
       const hasSliderList = (sourceSection.blocks || []).some((b) => b.type === "slider-list");
       if (hasSliderList) {

@@ -1,7 +1,3 @@
-/**
- * GET /listings/detail/:id ile aynı şekilde zenginleştirilmiş ilan objesi (public).
- */
-
 function normalizeContentGallery(input) {
   if (!Array.isArray(input)) return [];
   return input
@@ -43,7 +39,6 @@ function buildFieldMap(category, subcategorySlug) {
   const map = {};
   if (!category) return map;
 
-  // 1. Ana kategori alanlarını yükle
   for (const group of category.propertyGroups || []) {
     for (const field of group.fields || []) {
       if (field.key && !map[field.key]) {
@@ -52,7 +47,6 @@ function buildFieldMap(category, subcategorySlug) {
     }
   }
 
-  // 2. Eşleşen subcategory'nin alanları ana kategorinin üzerine yazar (override)
   const matchedSub = subcategorySlug
     ? (category.subcategories || []).find(
         (s) => s.slug === subcategorySlug || s.name === subcategorySlug,
@@ -121,7 +115,6 @@ function formatPropertyGroupsFull(rawValues, fieldMap) {
   return Array.from(groupMap.values());
 }
 
-/** Mongoose belgesi veya düz obje; agent + category populate edilmiş olmalı */
 function formatListingDetailPublic(listing) {
   const doc = listing.toObject ? listing.toObject() : listing;
   const images = normalizeListingImages(doc.images);

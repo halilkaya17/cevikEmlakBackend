@@ -1,16 +1,3 @@
-/**
- * Kullanılmayan MediaAsset kayıtlarını ve dosyalarını siler.
- *
- * "Kullanılmıyor" = URL başka hiçbir koleksiyonda geçmiyor (PageContent, Listing, vb.)
- * "Yinelenen" = URL başka yerde kullanılıyor ama MediaAsset'te de var → sadece DB kaydı silinir
- *
- * Kullanım:
- *   node src/cleanup-unused-media-assets.js --dry-run
- *   node src/cleanup-unused-media-assets.js --delete
- *
- * Ortam: MONGODB_URI (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -94,22 +81,17 @@ async function collectContentReferencedPaths() {
   for (const [Model, label] of CONTENT_MODELS) {
     const docs = await Model.find({}).lean();
     for (const doc of docs) collectPathsFromValue(doc, paths);
-    console.log(`${label}: ${docs.length} kayıt`);
   }
   return paths;
 }
 
 async function run() {
-  console.log("Kullanılmayan MediaAsset temizliği");
-  console.log(`  mod: ${DRY_RUN ? "dry-run" : "SİL (--delete)"}\n`);
 
   await connectDatabase();
 
   const contentPaths = await collectContentReferencedPaths();
-  console.log(`\nİçerikte referanslı dosya yolu: ${contentPaths.size}`);
 
   const assets = await MediaAsset.find({}).sort({ createdAt: -1 });
-  console.log(`MediaAsset kayıt: ${assets.length}\n`);
 
   const toDeleteWithFile = [];
   const toDeleteRecordOnly = [];
@@ -129,39 +111,24 @@ async function run() {
     }
   }
 
-  console.log("=== SİLİNECEK (dosya + kayıt) — hiçbir yerde kullanılmıyor ===");
   for (const { asset, rel } of toDeleteWithFile) {
     const exists = fs.existsSync(absolutePathForRelative(rel));
-    console.log(`  ${asset.originalName || asset.fileName}`);
-    console.log(`    id: ${asset._id} | ${rel} | disk: ${exists ? "var" : "yok"}`);
   }
 
-  console.log("\n=== SİLİNECEK (sadece kayıt) — dosya başka içerikte kullanılıyor ===");
   for (const { asset, rel } of toDeleteRecordOnly) {
     if (VERBOSE) {
-      console.log(`  ${asset.originalName || asset.fileName} (${rel})`);
     } else {
-      console.log(`  ${asset.originalName || asset.fileName}`);
     }
   }
   if (!VERBOSE && toDeleteRecordOnly.length) {
-    console.log("  (--verbose ile tam liste)");
   }
 
   if (toKeep.length) {
-    console.log("\n=== KALACAK ===");
     for (const { asset, reason } of toKeep) {
-      console.log(`  ${asset.originalName || asset.fileName} — ${reason}`);
     }
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`Silinecek (dosya+d kayıt): ${toDeleteWithFile.length}`);
-  console.log(`Silinecek (yalnız kayıt) : ${toDeleteRecordOnly.length}`);
-  console.log(`Kalacak                  : ${toKeep.length}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek silme için: node src/cleanup-unused-media-assets.js --delete");
     await mongoose.disconnect();
     return;
   }
@@ -183,20 +150,16 @@ async function run() {
       filesDeleted++;
     } catch (error) {
       fileErrors++;
-      console.error(`  ✗ dosya silinemedi ${rel}: ${error.message}`);
     }
   }
 
-  console.log(`\nSilinen kayıt: ${recordsDeleted}, silinen dosya: ${filesDeleted}, dosya hatası: ${fileErrors}`);
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

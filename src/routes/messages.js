@@ -79,7 +79,6 @@ function formatMessage(doc) {
   };
 }
 
-/** POST /api/v1/messages/listing-inquiry — ilan detay formu (public) */
 router.post("/listing-inquiry", publicLimiter, async (req, res, next) => {
   try {
     const fullName = pickStr(req.body.fullName ?? req.body.adSoyad ?? req.body.name);
@@ -112,7 +111,6 @@ router.post("/listing-inquiry", publicLimiter, async (req, res, next) => {
   }
 });
 
-/** POST /api/v1/messages/contact — iletisim sayfasi formu (public) */
 router.post("/contact", publicLimiter, async (req, res, next) => {
   try {
     const fullName = pickStr(req.body.fullName ?? req.body.adSoyad ?? req.body.name);
@@ -146,11 +144,6 @@ router.post("/contact", publicLimiter, async (req, res, next) => {
 });
 
 router.use(requireAuth);
-
-/**
- * GET /api/v1/messages — admin mesaj listesi
- * Query: type, read (true|false), page, limit
- */
 router.get("/", async (req, res, next) => {
   try {
     const query = {};
@@ -185,7 +178,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-/** GET /api/v1/messages/:id — admin tekil mesaj */
 router.get("/:id", async (req, res, next) => {
   try {
     const message = await InboxMessage.findById(req.params.id);
@@ -196,7 +188,6 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-/** PATCH /api/v1/messages/:id/read — okundu isaretle */
 router.patch("/:id/read", async (req, res, next) => {
   try {
     const message = await InboxMessage.findByIdAndUpdate(

@@ -5,7 +5,6 @@ const { reconcileMediaOnUpdate, reconcileMediaOnDelete } = require("../services/
 
 const router = express.Router();
 
-/** Kayıtta tutarlılık: firstName/lastName varsa name'i de doldur */
 function normalizeBody(body) {
   const out = { ...body };
   const first = (out.firstName || "").trim();
@@ -16,7 +15,6 @@ function normalizeBody(body) {
   return out;
 }
 
-/** GET /api/v1/agents */
 router.get("/", async (_req, res, next) => {
   try {
     const agents = await Agent.find().sort({ createdAt: -1 });
@@ -26,7 +24,6 @@ router.get("/", async (_req, res, next) => {
   }
 });
 
-/** POST /api/v1/agents */
 router.post("/", requireAuth, async (req, res, next) => {
   try {
     const agent = await Agent.create(normalizeBody(req.body));
@@ -36,7 +33,6 @@ router.post("/", requireAuth, async (req, res, next) => {
   }
 });
 
-/** PUT /api/v1/agents/:id */
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
     const old = await Agent.findById(req.params.id).lean();
@@ -53,7 +49,6 @@ router.put("/:id", requireAuth, async (req, res, next) => {
   }
 });
 
-/** DELETE /api/v1/agents/:id */
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
     const old = await Agent.findById(req.params.id).lean();

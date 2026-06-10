@@ -1,14 +1,3 @@
-/**
- * uploads/ içinde veritabanında referansı olmayan dosyaları bulur ve siler.
- *
- * Kullanım:
- *   node src/cleanup-orphan-uploads.js --dry-run   # sadece listele (varsayılan mod)
- *   node src/cleanup-orphan-uploads.js --delete    # gerçekten sil
- *   node src/cleanup-orphan-uploads.js --dry-run --verbose
- *
- * Ortam: MONGODB_URI (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -54,7 +43,6 @@ function normalizePathKey(relativePath) {
     .normalize("NFC");
 }
 
-/** String içinden uploads/... göreli yol çıkarır */
 function extractUploadsRelativePath(value) {
   if (typeof value !== "string" || !value.includes("/uploads/")) return null;
 
@@ -105,7 +93,6 @@ async function collectReferencedPaths() {
       collectPathsFromValue(doc, paths);
       if (paths.size > before) count++;
     }
-    console.log(`${label}: ${docs.length} kayıt tarandı`);
   }
 
   return paths;
@@ -137,18 +124,13 @@ function formatBytes(bytes) {
 }
 
 async function run() {
-  console.log("Orphan uploads temizliği");
-  console.log(`  mod     : ${DRY_RUN ? "dry-run (silme yok)" : "SİL (--delete)"}`);
-  console.log(`  uploads : ${UPLOAD_DIR}\n`);
 
   if (!fs.existsSync(UPLOAD_DIR)) {
     throw new Error(`uploads klasörü bulunamadı: ${UPLOAD_DIR}`);
   }
 
   await connectDatabase();
-  console.log("");
   const referenced = await collectReferencedPaths();
-  console.log(`\nDB'de referanslı dosya: ${referenced.size}`);
 
   const diskFiles = walkUploadFiles(UPLOAD_DIR);
   const orphans = [];
@@ -167,28 +149,18 @@ async function run() {
     const size = fs.statSync(file.absolute).size;
     totalBytes += size;
     if (i < showLimit) {
-      console.log(`  [orphan] ${file.relative} (${formatBytes(size)})`);
     }
   }
 
   if (orphans.length > showLimit) {
-    console.log(`  ... ve ${orphans.length - showLimit} dosya daha (--verbose ile tam liste)`);
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`Diskteki dosya     : ${diskFiles.length}`);
-  console.log(`DB'de referanslı   : ${referenced.size}`);
-  console.log(`Orphan (silinecek) : ${orphans.length}`);
-  console.log(`Toplam boyut       : ${formatBytes(totalBytes)}`);
-
   if (!orphans.length) {
-    console.log("\nSilinecek dosya yok.");
     await mongoose.disconnect();
     return;
   }
 
   if (DRY_RUN) {
-    console.log("\nGerçek silme için: node src/cleanup-orphan-uploads.js --delete");
     await mongoose.disconnect();
     return;
   }
@@ -201,20 +173,16 @@ async function run() {
       deleted++;
     } catch (error) {
       failed++;
-      console.error(`  ✗ ${file.relative}: ${error.message}`);
     }
   }
 
-  console.log(`\nSilinen: ${deleted}, hata: ${failed}`);
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

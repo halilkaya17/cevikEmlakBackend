@@ -31,7 +31,6 @@ const categorySchema = new mongoose.Schema(
 const bannerSchema = new mongoose.Schema(
   {
     title: { type: String, default: "" },
-    /** Tam genişlik hero arka planı (URL veya /public yolu) */
     backgroundImage: { type: String, default: "" },
     image1: { type: String, default: "" },
     image2: { type: String, default: "" },

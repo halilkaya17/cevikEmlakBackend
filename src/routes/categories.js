@@ -5,14 +5,12 @@ const { toSlug } = require("../utils/slug");
 
 const router = express.Router();
 
-/** Konut / İşyeri / Arsa / Proje — seed slug’ları; silme yasak */
 const CORE_ROOT_CATEGORY_SLUGS = new Set(["konut", "isyeri", "is-yeri", "arsa", "proje"]);
 
 const requiredCoreFields = [
   { key: "oda-sayisi", label: "Oda Sayısı", type: "text", unit: "", required: false, showOnCard: true, quickView: false, options: [] },
 ];
 
-/** "oda_sayisi" ve "oda-sayisi" gibi tire/alt çizgi farklarını eşit say */
 function normalizeKey(key) {
   return (key || "").replace(/-/g, "_");
 }
@@ -25,7 +23,6 @@ function hasFieldWithKey(fields, key) {
   return (fields || []).some((f) => normalizeKey(f.key) === normalizeKey(key));
 }
 
-/** Ana kategori propertyGroups = şablon; her alt tipte bu gruplar ve alanlar korunmalı (Konut, İş Yeri, Arsa, Proje, …). */
 function validateSubcategoriesPreserveTemplate(propertyGroupsTemplate, subcategories) {
   const tpl = propertyGroupsTemplate || [];
   if (!tpl.length) return null;
@@ -52,7 +49,6 @@ function ensureCoreFields(propertyGroups = []) {
   return (propertyGroups || [])
     .filter((group) => group && typeof group === "object")
     .map((group) => {
-    // Tüm gruplarda önce kopyaları temizle (normalized key'e göre ilk geçen kazanır)
     const seen = new Set();
     let fields = (group.fields || []).filter((f) => {
       const nk = normalizeKey(f.key);
@@ -65,7 +61,6 @@ function ensureCoreFields(propertyGroups = []) {
       return { ...group, fields };
     }
 
-    // temel-ozellikler grubuna zorunlu alanları ekle (yoksa)
     const fieldKeys = new Set(fields.map((f) => normalizeKey(f.key)));
     const odaIndex = fields.findIndex((f) => normalizeKey(f.key) === "oda_sayisi");
     let insertIndex = odaIndex >= 0 ? odaIndex + 1 : fields.length;
@@ -81,12 +76,10 @@ function ensureCoreFields(propertyGroups = []) {
   });
 }
 
-/** alan-yeni-* veya grup-yeni-* pattern'ı tanır */
 function isAutoKey(key) {
   return /^(alan|grup)-yeni-\d+$/.test(key || "");
 }
 
-/** label'dan slug üretir: "Brüt m²" → "brut-m2" */
 function generateKey(label) {
   return toSlug(label || "alan");
 }
@@ -151,7 +144,6 @@ function normalizeCategory(category) {
     })),
   };
 }
-
 
 router.get("/", async (_req, res, next) => {
   try {

@@ -7,11 +7,8 @@ const port = process.env.PORT || 5001;
 
 connectDatabase()
   .then(() => {
-    app.listen(port, () => {
-      console.log(`Cevik Emlak API http://localhost:${port}`);
-    });
+    app.listen(port, () => {});
   })
-  .catch((error) => {
-    console.error("Database connection failed", error);
+  .catch(() => {
     process.exit(1);
   });

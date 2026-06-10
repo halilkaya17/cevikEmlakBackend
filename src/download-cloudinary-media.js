@@ -1,21 +1,3 @@
-/**
- * Cloudinary'deki medyaları uploads/ altına indirir.
- * MongoDB'ye dokunmaz.
- *
- * Dosya yolu: uploads/{public_id}.{format}
- *   örn. uploads/cevik-emlak/abc123.jpg
- *
- * Kullanım:
- *   node src/download-cloudinary-media.js --dry-run   # sadece listele
- *   node src/download-cloudinary-media.js             # indir
- *   node src/download-cloudinary-media.js --force     # mevcut dosyaların üzerine yaz
- *
- * Ortam:
- *   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET (.env)
- *   CLOUDINARY_PREFIX=cevik-emlak   (opsiyonel, varsayılan: cevik-emlak)
- *   CLOUDINARY_DOWNLOAD_CONCURRENCY=3
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -106,25 +88,17 @@ async function runPool(tasks, concurrency) {
 async function run() {
   const cloudinary = cloudinaryV2();
 
-  console.log("Cloudinary medya indirme");
-  console.log(`  prefix     : ${PREFIX}`);
-  console.log(`  hedef      : ${UPLOAD_DIR}`);
-  console.log(`  mod        : ${DRY_RUN ? "dry-run (indirme yok)" : FORCE ? "indir (--force)" : "indir"}`);
-  console.log(`  eşzamanlı  : ${CONCURRENCY}\n`);
-
   const allResources = [];
 
   for (const resourceType of RESOURCE_TYPES) {
     process.stdout.write(`${resourceType} listeleniyor... `);
     const list = await listAllResources(cloudinary, resourceType);
-    console.log(`${list.length} kayıt`);
     for (const item of list) {
       allResources.push({ ...item, resource_type: resourceType });
     }
   }
 
   if (!allResources.length) {
-    console.log("\nİndirilecek dosya bulunamadı.");
     return;
   }
 
@@ -161,12 +135,10 @@ async function run() {
 
     if (fs.existsSync(dest) && !FORCE) {
       skipped++;
-      console.log(`  atlandı (mevcut): ${relative}`);
       return;
     }
 
     if (DRY_RUN) {
-      console.log(`  [dry-run] ${resource.resource_type} → ${relative}`);
       downloaded++;
       return;
     }
@@ -174,39 +146,25 @@ async function run() {
     try {
       await downloadToFile(url, dest);
       downloaded++;
-      console.log(`  ✓ ${relative}`);
     } catch (error) {
       failed++;
       failures.push({ public_id: resource.public_id, error: error.message });
-      console.error(`  ✗ ${relative}: ${error.message}`);
     }
   });
 
-  console.log(`\n${unique.length} benzersiz dosya işlenecek...\n`);
   await runPool(tasks, CONCURRENCY);
 
-  console.log("\n=== ÖZET ===");
-  console.log(`Toplam (Cloudinary) : ${unique.length}`);
-  console.log(`İndirilen / dry-run : ${downloaded}`);
-  console.log(`Atlanan (mevcut)    : ${skipped}`);
-  console.log(`Hata                : ${failed}`);
-
   if (failures.length) {
-    console.log("\nHatalı kayıtlar:");
     for (const item of failures.slice(0, 20)) {
-      console.log(`  - ${item.public_id}: ${item.error}`);
     }
     if (failures.length > 20) {
-      console.log(`  ... ve ${failures.length - 20} kayıt daha`);
     }
   }
 
   if (DRY_RUN) {
-    console.log("\nGerçek indirme için: node src/download-cloudinary-media.js");
   }
 }
 
 run().catch((err) => {
-  console.error("\nHata:", err.message || err);
   process.exit(1);
 });

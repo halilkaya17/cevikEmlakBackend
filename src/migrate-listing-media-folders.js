@@ -1,17 +1,3 @@
-/**
- * İlan medyalarını uploads/listings/{listingId}/ altına taşır ve DB URL'lerini günceller.
- *
- * Kapsam (Listing):
- *   images, documents, floorPlans.images, contentGallery, description (HTML)
- *
- * Kullanım:
- *   node src/migrate-listing-media-folders.js --dry-run   # sadece plan (varsayılan)
- *   node src/migrate-listing-media-folders.js --apply      # taşı + DB güncelle
- *   node src/migrate-listing-media-folders.js --apply --verbose
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -161,7 +147,6 @@ function resolveNewUrl(oldUrl, listingId, refCounts, cache) {
   const srcPath = absolutePathForRelative(rel);
   if (!fs.existsSync(srcPath)) {
     stats.missingFile++;
-    if (VERBOSE) console.log(`    [dosya yok] ${rel}`);
     cache.set(oldUrl, oldUrl);
     return oldUrl;
   }
@@ -173,7 +158,6 @@ function resolveNewUrl(oldUrl, listingId, refCounts, cache) {
   const copy = (refCounts.get(rel) || 0) > 1;
 
   if (DRY_RUN) {
-    console.log(`    [dry-run] ${copy ? "kopyala" : "taşı"}: ${rel} → ${newRel}`);
   } else if (!fs.existsSync(destPath)) {
     transferFile(srcPath, destPath, copy);
   }
@@ -229,18 +213,12 @@ function stableStringify(value) {
 }
 
 async function run() {
-  console.log("İlan medyalarını listings/{id}/ altına taşıma");
-  console.log(`  mod         : ${DRY_RUN ? "dry-run" : "uygula"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}`);
-  console.log(`  hedef       : ${LISTINGS_DIR}\n`);
 
   await connectDatabase();
 
   const listings = await Listing.find({});
-  console.log(`Toplam ilan: ${listings.length}\n`);
 
   const refCounts = buildRefCounts(listings);
-  console.log(`Benzersiz local medya yolu: ${refCounts.size}\n`);
 
   for (const listing of listings) {
     stats.listingsProcessed++;
@@ -253,37 +231,22 @@ async function run() {
     stats.listingsUpdated++;
 
     if (DRY_RUN) {
-      console.log(`[dry-run] Listing ${listing._id} (${listing.listingNo || listing.slug})`);
       continue;
     }
 
     await Listing.replaceOne({ _id: listing._id }, afterObj);
-    console.log(`✓ Listing ${listing._id} (${listing.listingNo || listing.slug})`);
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`İşlenen ilan       : ${stats.listingsProcessed}`);
-  console.log(`Güncellenen ilan   : ${stats.listingsUpdated}`);
-  console.log(`Güncellenen URL    : ${stats.urlsUpdated}`);
-  console.log(`Taşınan dosya      : ${stats.filesMoved}`);
-  console.log(`Kopyalanan dosya   : ${stats.filesCopied}`);
-  console.log(`Zaten doğru klasör : ${stats.alreadyInPlace}`);
-  console.log(`Dosya bulunamadı   : ${stats.missingFile}`);
-  console.log(`Cloudinary (atlandı): ${stats.skippedExternal}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek taşıma için: node src/migrate-listing-media-folders.js --apply");
   }
 
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

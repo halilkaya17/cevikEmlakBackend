@@ -1,10 +1,3 @@
-/**
- * Migration: Tüm category ve subcategory propertyGroups içindeki
- * "oda-sayisi" field'larını referans tanıma göre günceller.
- *
- * Kullanım: node src/migrate-oda-sayisi.js
- */
-
 require("dotenv").config();
 const mongoose = require("mongoose");
 const Category = require("./models/Category");
@@ -64,13 +57,9 @@ const ODA_SAYISI_REF = {
   quickView: false,
 };
 
-/** "oda-sayisi" veya "oda_sayisi" key'lerini tanır */
 function isOdaField(key) {
   return key === "oda-sayisi" || key === "oda_sayisi";
 }
-
-/** propertyGroups dizisindeki oda-sayisi / oda_sayisi field'larını referansla günceller.
- *  required / showOnCard / quickView mevcut değerleri korunur. */
 function patchGroups(groups) {
   let changed = false;
   const patched = (groups || []).map((group) => {
@@ -94,7 +83,6 @@ function patchGroups(groups) {
         unit:    ODA_SAYISI_REF.unit,
         icon:    ODA_SAYISI_REF.icon,
         options: ODA_SAYISI_REF.options,
-        // required / showOnCard / quickView mevcut değerde kalır
       };
     });
     return { ...group, fields };
@@ -103,9 +91,7 @@ function patchGroups(groups) {
 }
 
 async function run() {
-  console.log("MongoDB'ye bağlanılıyor...");
   await mongoose.connect(process.env.MONGODB_URI);
-  console.log("Bağlantı kuruldu.\n");
 
   const categories = await Category.find({}).lean();
   let totalCats = 0;
@@ -115,7 +101,6 @@ async function run() {
     let catChanged = false;
     const update = {};
 
-    // Parent propertyGroups
     const pgResult = patchGroups(cat.propertyGroups);
     if (pgResult.changed) {
       update.propertyGroups = pgResult.patched;
@@ -125,7 +110,6 @@ async function run() {
         .filter((f) => f.key === "oda-sayisi").length;
     }
 
-    // Subcategories
     const patchedSubs = (cat.subcategories || []).map((sub) => {
       const subResult = patchGroups(sub.propertyGroups);
       if (subResult.changed) {
@@ -142,21 +126,13 @@ async function run() {
       update.subcategories = patchedSubs;
       await Category.findByIdAndUpdate(cat._id, update);
       totalCats++;
-      console.log(`✓ Güncellendi: ${cat.name}`);
     } else {
-      console.log(`  Atlandı:    ${cat.name} (zaten güncel)`);
     }
   }
 
-  console.log(`\n=== ÖZET ===`);
-  console.log(`Güncellenen kategori : ${totalCats}`);
-  console.log(`Güncellenen oda-sayisi field : ${totalFields}`);
-
   await mongoose.disconnect();
-  console.log("\nTamamlandı.");
 }
 
 run().catch((err) => {
-  console.error("Hata:", err);
   process.exit(1);
 });

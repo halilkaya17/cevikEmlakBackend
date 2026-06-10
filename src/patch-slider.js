@@ -18,26 +18,17 @@ async function main() {
   ];
 
   const page = await PageContent.findOne({ pageKey: "home" });
-  if (!page) {
-    console.log("home sayfası bulunamadı");
-    process.exit(1);
+  if (!page) {process.exit(1);
   }
 
   const sliderIdx = page.sections.findIndex((s) => s.key === "slider");
-  if (sliderIdx === -1) {
-    console.log("slider section bulunamadı");
-    process.exit(1);
+  if (sliderIdx === -1) {process.exit(1);
   }
 
   page.sections[sliderIdx].blocks = newSliderBlocks;
   page.markModified("sections");
-  await page.save();
-
-  console.log("Slider section guncellendi");
-  process.exit(0);
+  await page.save();process.exit(0);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+main().catch((err) => {process.exit(1);
 });

@@ -92,7 +92,6 @@ function normalizeHakkimizdaPage(page) {
       (sourceSection.blocks || []).map((b) => [b.key, b.value]),
     );
 
-    // timeline-list: dizi olarak koru
     return {
       ...templateSection,
       blocks: templateSection.blocks.map((templateBlock) => {

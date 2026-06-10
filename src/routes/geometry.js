@@ -10,8 +10,6 @@ const HEADERS = {
   "Accept-Language": "tr,en",
 };
 
-// ─── Nominatim ────────────────────────────────────────────────────────────────
-
 async function nominatimSearch(q) {
   try {
     const url = new URL(NOMINATIM_BASE);
@@ -24,15 +22,11 @@ async function nominatimSearch(q) {
     url.searchParams.set("countrycodes", "tr");
 
     const res = await fetch(url.toString(), { headers: HEADERS, signal: AbortSignal.timeout(10000) });
-    if (!res.ok) { console.warn(`[geometry] Nominatim HTTP ${res.status}`); return []; }
+    if (!res.ok) {return []; }
     return await res.json();
-  } catch (err) {
-    console.warn("[geometry] Nominatim hatası:", err.message);
-    return [];
+  } catch (err) {return [];
   }
 }
-
-// ─── Overpass — sadece relation ID ile geometry çek (hızlı) ───────────────────
 
 async function overpassById(osmType, osmId) {
   const type = osmType === "relation" ? "relation" : osmType === "way" ? "way" : "node";
@@ -45,21 +39,16 @@ async function overpassById(osmType, osmId) {
       body: `data=${encodeURIComponent(query)}`,
       signal: AbortSignal.timeout(22000),
     });
-    if (!res.ok) { console.warn(`[geometry] Overpass HTTP ${res.status}`); return null; }
+    if (!res.ok) {return null; }
     const data = await res.json();
     return overpassToGeoJSON(data);
-  } catch (err) {
-    console.warn("[geometry] Overpass hatası:", err.message);
-    return null;
+  } catch (err) {return null;
   }
 }
-
-// ─── Overpass → GeoJSON dönüşümü ─────────────────────────────────────────────
 
 function overpassToGeoJSON(data) {
   const elements = data.elements || [];
 
-  // Relation
   const rel = elements.find((e) => e.type === "relation" && e.members);
   if (rel) {
     const rings = [];
@@ -74,7 +63,6 @@ function overpassToGeoJSON(data) {
     if (rings.length > 0) return { type: "MultiPolygon", coordinates: rings };
   }
 
-  // Way (basit poligon)
   const way = elements.find((e) => e.type === "way" && e.geometry?.length > 1);
   if (way) {
     const coords = way.geometry.map((p) => [p.lon, p.lat]);
@@ -86,9 +74,6 @@ function overpassToGeoJSON(data) {
   return null;
 }
 
-// ─── Yardımcılar ──────────────────────────────────────────────────────────────
-
-// Mahalle tiplerinin OSM'deki Nominatim type/class değerleri
 const NEIGHBORHOOD_TYPES = new Set(["suburb", "quarter", "neighbourhood", "village", "hamlet", "residential", "administrative"]);
 
 function normalizeTr(str) {
@@ -101,7 +86,6 @@ function normalizeTr(str) {
     .replace(/\s+/g, " ").trim();
 }
 
-/** "Mah." → "Mahallesi", "Köy" → "Köyü" gibi kısaltmaları genişletir */
 function expandNeighborhood(name) {
   if (!name) return name;
   return name
@@ -110,13 +94,6 @@ function expandNeighborhood(name) {
     .replace(/\bKöy\b(?!ü)/gi, "Köyü")
     .trim();
 }
-
-/**
- * Nominatim sonuçlarını strict biçimde filtreler.
- * desiredLevel="8" → sadece admin_level=8 veya mahalle/köy tipi sonuçlar
- * desiredLevel="6" → sadece admin_level=6
- * desiredLevel="4" → sadece admin_level=4
- */
 function pickBest(results, cityVal, districtVal, desiredLevel) {
   if (!results?.length) return null;
 
@@ -151,13 +128,6 @@ function pickBest(results, cityVal, districtVal, desiredLevel) {
 
   return scored[0]?.score > 0 ? scored[0].r : null;
 }
-
-// ─── Route ────────────────────────────────────────────────────────────────────
-
-/**
- * GET /api/v1/geometry?city=Mardin&district=Kızıltepe&neighborhood=Soğanlı Mh.
- * GET /api/v1/geometry?baslik_ful=Mardin, Kızıltepe, Soğanlı Mh.
- */
 router.get("/", async (req, res, next) => {
   try {
     const { baslik_ful, city, district, neighborhood } = req.query;
@@ -182,26 +152,18 @@ router.get("/", async (req, res, next) => {
     const desiredLevel = neighborhoodVal ? "8" : districtVal ? "6" : "4";
     const targetName   = neighborhoodVal ?? districtVal ?? cityVal;
 
-    // 1) Nominatim ara — önce orijinal isimle, bulamazsa genişletilmiş isimle dene
-    const q = [neighborhoodVal, districtVal, cityVal].filter(Boolean).join(", ") + ", Türkiye";
-    console.log("[geometry] Nominatim sorgusu:", q);
-    let results = await nominatimSearch(q);
+    const q = [neighborhoodVal, districtVal, cityVal].filter(Boolean).join(", ") + ", Türkiye";let results = await nominatimSearch(q);
     let best = pickBest(results, cityVal, districtVal, desiredLevel);
 
     if (!best && neighborhoodVal) {
       const expanded = expandNeighborhood(neighborhoodVal);
       if (expanded !== neighborhoodVal) {
-        const q2 = [expanded, districtVal, cityVal].filter(Boolean).join(", ") + ", Türkiye";
-        console.log("[geometry] Nominatim genişletilmiş sorgu:", q2);
-        const results2 = await nominatimSearch(q2);
+        const q2 = [expanded, districtVal, cityVal].filter(Boolean).join(", ") + ", Türkiye";const results2 = await nominatimSearch(q2);
         best = pickBest(results2, cityVal, districtVal, desiredLevel);
       }
     }
 
     if (best) {
-      console.log(`[geometry] Nominatim buldu: admin_level=${best.extratags?.admin_level} → ${best.display_name}`);
-
-      // Nominatim zaten poligon döndürdüyse direkt kullan
       if (best.geojson) {
         return res.json({
           source: "nominatim",
@@ -214,10 +176,7 @@ router.get("/", async (req, res, next) => {
         });
       }
 
-      // Poligon yoksa Overpass'tan ID ile çek (çok hızlı)
-      if (best.osm_type && best.osm_id) {
-        console.log(`[geometry] Overpass ID sorgusu: ${best.osm_type}(${best.osm_id})`);
-        const geojson = await overpassById(best.osm_type, best.osm_id);
+      if (best.osm_type && best.osm_id) {const geojson = await overpassById(best.osm_type, best.osm_id);
         if (geojson) {
           return res.json({
             source: "overpass",
@@ -232,11 +191,8 @@ router.get("/", async (req, res, next) => {
       }
     }
 
-    // 2) Nominatim bulamadıysa ilçe bazında fallback
     if (neighborhoodVal && (districtVal || cityVal)) {
-      const fallbackQ = [districtVal, cityVal].filter(Boolean).join(", ") + ", Türkiye";
-      console.log("[geometry] Fallback sorgusu:", fallbackQ);
-      const fbResults = await nominatimSearch(fallbackQ);
+      const fallbackQ = [districtVal, cityVal].filter(Boolean).join(", ") + ", Türkiye";const fbResults = await nominatimSearch(fallbackQ);
       const fbBest = pickBest(fbResults, cityVal, districtVal, "6");
       if (fbBest?.geojson) {
         return res.json({
@@ -253,9 +209,7 @@ router.get("/", async (req, res, next) => {
     }
 
     return res.status(404).json({ message: "Konum bulunamadı", query: q });
-  } catch (error) {
-    console.error("[geometry] beklenmeyen hata:", error.message);
-    next(error);
+  } catch (error) {next(error);
   }
 });
 

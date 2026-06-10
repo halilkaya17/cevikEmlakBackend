@@ -1,16 +1,8 @@
-/**
- * Migration: Veritabanındaki "grup-yeni-*" ve "alan-yeni-*" key'lerini
- * label/name'den üretilen slug+timestamp formatına çevirir.
- *
- * Kullanım: node src/migrate-auto-keys.js
- */
-
 require("dotenv").config();
 const mongoose = require("mongoose");
 const Category = require("./models/Category");
 const { toSlug } = require("./utils/slug");
 
-/** "grup-yeni-*", "alan-yeni-*" veya daha önce slug+timestamp olarak migrate edilmiş key'leri tanır */
 function isAutoKey(key) {
   return /^(alan|grup)-yeni-\d+$/.test(key || "") || /^.+-\d{13}$/.test(key || "");
 }
@@ -53,9 +45,7 @@ function patchGroups(groups) {
 }
 
 async function run() {
-  console.log("MongoDB'ye bağlanılıyor...");
   await mongoose.connect(process.env.MONGODB_URI);
-  console.log("Bağlantı kuruldu.\n");
 
   const categories = await Category.find({}).lean();
   let totalCats = 0;
@@ -97,51 +87,36 @@ async function run() {
       update.subcategories = patchedSubs;
       await Category.findByIdAndUpdate(cat._id, update);
       totalCats++;
-      console.log(`✓ Güncellendi: ${cat.name}`);
 
-      // Hangi alt tipler güncellendi göster
       (cat.subcategories || []).forEach((sub, i) => {
         const pSub = patchedSubs[i];
         const subChanged = JSON.stringify(sub.propertyGroups) !== JSON.stringify(pSub.propertyGroups);
         if (subChanged) {
-          console.log(`    └─ ${sub.name || sub.slug}`);
           (pSub.propertyGroups || []).forEach((g, gi) => {
             const origGroup = (sub.propertyGroups || [])[gi] || {};
             if (g.key !== origGroup.key) {
-              console.log(`       Grup: "${origGroup.key}" → "${g.key}"`);
             }
             (g.fields || []).forEach((f, fi) => {
               const origField = (origGroup.fields || [])[fi] || {};
               if (f.key !== origField.key) {
-                console.log(`         Alan: "${origField.key}" → "${f.key}"  (${f.label})`);
               }
             });
           });
         }
       });
 
-      // Parent grup değişimleri
       (pgResult.patched || []).forEach((g, gi) => {
         const origGroup = (cat.propertyGroups || [])[gi] || {};
         if (g.key !== origGroup.key) {
-          console.log(`   Parent grup: "${origGroup.key}" → "${g.key}"`);
         }
       });
     } else {
-      console.log(`  Atlandı:    ${cat.name}`);
     }
   }
 
-  console.log(`\n=== ÖZET ===`);
-  console.log(`Güncellenen kategori : ${totalCats}`);
-  console.log(`Güncellenen grup     : ${totalGroups}`);
-  console.log(`Güncellenen alan     : ${totalFields}`);
-
   await mongoose.disconnect();
-  console.log("\nTamamlandı.");
 }
 
 run().catch((err) => {
-  console.error("Hata:", err);
   process.exit(1);
 });

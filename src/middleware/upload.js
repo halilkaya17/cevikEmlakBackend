@@ -3,9 +3,9 @@ const multer = require("multer");
 const multerS3 = require("multer-s3");
 const { S3Client } = require("@aws-sdk/client-s3");
 
-const IMAGE_SIZE_LIMIT = 20 * 1024 * 1024;   // 20 MB
-const VIDEO_SIZE_LIMIT = 150 * 1024 * 1024;  // 150 MB
-const DOCUMENT_SIZE_LIMIT = 200 * 1024 * 1024; // 200 MB
+const IMAGE_SIZE_LIMIT = 20 * 1024 * 1024;
+const VIDEO_SIZE_LIMIT = 150 * 1024 * 1024;
+const DOCUMENT_SIZE_LIMIT = 200 * 1024 * 1024;
 
 function fileName(file) {
   const ext = path.extname(file.originalname || "");
@@ -22,8 +22,6 @@ function fileSizeFilter(_req, file, cb) {
   if (!isVideo && !file.mimetype.startsWith("image/") && !file.mimetype.includes("pdf")) {
     return cb(new Error("Desteklenmeyen dosya türü"));
   }
-  // Boyut limiti multer options'tan geliyor; burada tür bazlı reddetme
-  // büyük video isteği route'ta kontrol edilir (buffer.length > VIDEO_SIZE_LIMIT)
   cb(null, true);
 }
 

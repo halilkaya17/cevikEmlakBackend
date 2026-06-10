@@ -78,7 +78,6 @@ function normalizeGeneralSettings(page) {
   return next;
 }
 
-/** Normalize edilmiş genel-ayarlar sayfasından sosyal medya dizisini döner */
 function extractSocialLinks(normalizedPage) {
   const socialSection = (normalizedPage?.sections || []).find((s) => s.key === "social");
   const linksBlock = (socialSection?.blocks || []).find((b) => b.key === "links");
@@ -99,7 +98,6 @@ function setBlockValue(sections, sectionKey, blockKey, value) {
   if (block) block.value = value;
 }
 
-/** Public GET: SMTP şifresini response'tan çıkar */
 function maskMailSecretsForPublic(page) {
   const doc = page?.toObject ? page.toObject() : page;
   if (!doc || doc.pageKey !== "genel-ayarlar") return page;
@@ -107,11 +105,6 @@ function maskMailSecretsForPublic(page) {
   setBlockValue(next.sections, "mail", "smtpPass", "");
   return next;
 }
-
-/**
- * PUT sonrası: body'de smtpPass boşsa DB'deki mevcut şifreyi koru (yeniden yazmayı zorunlu kılma).
- * payload normalize edilmiş PageContent dokümanı olmalı.
- */
 function preserveSmtpPasswordIfEmpty(payload, existingLean) {
   if (!payload || payload.pageKey !== "genel-ayarlar" || !existingLean) return payload;
   const incoming = getBlockValue(payload.sections, "mail", "smtpPass");

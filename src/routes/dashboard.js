@@ -67,7 +67,6 @@ router.get("/", requireAuth, async (_req, res, next) => {
         { $sort: { count: -1 } },
       ]),
       Agent.find({ active: true }).select("_id name firstName lastName title photo").lean(),
-      // Son 7 gün: ListingView kayıtlarından günlük benzersiz ziyaret sayısı
       ListingView.aggregate([
         { $match: { createdAt: { $gte: sevenDaysAgo } } },
         {
@@ -87,14 +86,12 @@ router.get("/", requireAuth, async (_req, res, next) => {
       ListingView.countDocuments(),
     ]);
 
-    // Kategori isimlerini çek
     const categorySlugs = categoryBreakdown.map((r) => r._id);
     const categoryDocs = await Category.find({ slug: { $in: categorySlugs } })
       .select("slug name")
       .lean();
     const categoryNameMap = new Map(categoryDocs.map((c) => [c.slug, c.name]));
 
-    // Agent istatistik haritası
     const agentCountMap = new Map(agentListingCounts.map((r) => [String(r._id), r.count]));
     const agents = agentDocs.map((a) => ({
       _id:          String(a._id),
@@ -104,7 +101,6 @@ router.get("/", requireAuth, async (_req, res, next) => {
       listingCount: agentCountMap.get(String(a._id)) || 0,
     })).sort((a, b) => b.listingCount - a.listingCount);
 
-    // latestListings: cardImage ekle
     const formatCard = (listing) => {
       const doc = listing.toObject ? listing.toObject() : listing;
       const cover = doc.images?.find((img) => img.isCover) || doc.images?.[0];

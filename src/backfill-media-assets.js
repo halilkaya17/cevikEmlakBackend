@@ -1,17 +1,3 @@
-/**
- * İçerik koleksiyonlarındaki mevcut medya URL'leri için MediaAsset kayıtları oluşturur.
- *
- * Kapsam: Listing, PageContent, BlogPost, Agent, SssContent, DocFile
- * (DocFile görselleri/dosyaları da envantere alınır)
- *
- * Kullanım:
- *   node src/backfill-media-assets.js --dry-run
- *   node src/backfill-media-assets.js --apply
- *   node src/backfill-media-assets.js --apply --verbose
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -124,7 +110,6 @@ function fileNameFromPath(relativePath) {
   return path.basename(relativePath.split("/").join(path.sep));
 }
 
-/** key → { type: 'local'|'cloudinary', relativePath, url, sources: Set } */
 async function collectReferencedMedia() {
   const map = new Map();
 
@@ -171,16 +156,11 @@ async function mediaAssetExists({ url, relativePath, cloudinaryId }) {
 }
 
 async function run() {
-  console.log("Mevcut medyalar için MediaAsset backfill");
-  console.log(`  mod         : ${DRY_RUN ? "dry-run" : "uygula"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}`);
-  console.log(`  uploads     : ${UPLOAD_DIR}\n`);
 
   await connectDatabase();
 
   const referenced = await collectReferencedMedia();
   stats.uniqueUrls = referenced.size;
-  console.log(`Benzersiz medya referansı: ${referenced.size}\n`);
 
   for (const [key, meta] of [...referenced.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const { type, url, relativePath, sources } = meta;
@@ -190,7 +170,6 @@ async function run() {
     const existing = await mediaAssetExists({ url, relativePath, cloudinaryId });
     if (existing) {
       stats.skippedExisting++;
-      if (VERBOSE) console.log(`  [var] ${type === "local" ? relativePath : url}`);
       continue;
     }
 
@@ -202,7 +181,6 @@ async function run() {
       const abs = absolutePathForRelative(relativePath);
       if (!fs.existsSync(abs)) {
         stats.skippedMissingFile++;
-        console.log(`  [dosya yok] ${relativePath} (${[...sources].join(", ")})`);
         continue;
       }
       const stat = fs.statSync(abs);
@@ -227,37 +205,24 @@ async function run() {
     };
 
     if (DRY_RUN) {
-      console.log(`[dry-run] + MediaAsset  ${type === "local" ? relativePath : url}`);
-      console.log(`          scope=${doc.scope} kind=${doc.kind} sources=${[...sources].join(",")}`);
       stats.created++;
       continue;
     }
 
     await MediaAsset.create(doc);
     stats.created++;
-    console.log(`✓ ${type === "local" ? relativePath : url} (${[...sources].join(", ")})`);
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`Benzersiz referans : ${stats.uniqueUrls}`);
-  console.log(`Oluşturulan        : ${stats.created}`);
-  console.log(`Zaten vardı        : ${stats.skippedExisting}`);
-  console.log(`Dosya bulunamadı   : ${stats.skippedMissingFile}`);
-  console.log(`Cloudinary URL     : ${stats.cloudinaryUrls}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek oluşturma için: node src/backfill-media-assets.js --apply");
   }
 
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

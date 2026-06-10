@@ -46,12 +46,10 @@ function falsyEnv(value) {
   return value === "0" || value === "false" || value === "no" || value === "FALSE";
 }
 
-/** Tüm origin’lere izin (credentials ile birlikte: gelen Origin yansıtılır). Render’da acil çözüm için CORS_ALLOW_ALL=true */
 const corsAllowAll =
   truthyEnv(process.env.CORS_ALLOW_ALL) ||
   rawClientOrigins.some((o) => o === "*" || /^all$/i.test(o));
 
-/** Vercel preview (*.vercel.app): açık flag veya CLIENT_ORIGIN içinde zaten bir vercel.app adresi varsa */
 function vercelWildcardAllowed() {
   if (truthyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) return true;
   if (falsyEnv(process.env.CLIENT_ORIGIN_ALLOW_VERCEL)) return false;
@@ -60,7 +58,6 @@ function vercelWildcardAllowed() {
 
 const vercelOriginRegex = /^https:\/\/.+\.vercel\.app$/i;
 
-/** CORS + 404 + hata cevaplarında aynı kural */
 function isRequestOriginAllowed(originHeader) {
   if (!originHeader) return true;
   if (corsAllowAll) return true;
@@ -73,7 +70,6 @@ function isRequestOriginAllowed(originHeader) {
   return false;
 }
 
-/** cors paketine verilecek origin — Error callback kullanılmaz */
 function buildCorsOriginOption() {
   if (corsAllowAll) return true;
   if (!rawClientOrigins.length) return true;
@@ -141,7 +137,6 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(uploadDir));
 
-// Admin paneli: statik HTML/JS uygulama ( /yonetim )
 app.use(
   "/yonetim",
   express.static(adminDir, {
@@ -154,7 +149,6 @@ app.get(["/yonetim", "/yonetim/", "/yonetim/*"], (_req, res) => {
   res.sendFile(path.join(adminDir, "index.html"));
 });
 
-// Login sayfasi icin kisa yol
 app.get("/giris", (_req, res) => {
   res.sendFile(path.join(adminDir, "login.html"));
 });

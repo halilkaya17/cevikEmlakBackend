@@ -31,11 +31,6 @@ async function getStorageQuota() {
     percent: limit > 0 ? Math.min(100, (used / limit) * 100) : 0,
   };
 }
-
-/**
- * Yeni dosya yazılmadan önce çağrılır. Limit aşılırsa hata fırlatır.
- * @param {number} additionalBytes
- */
 async function assertStorageAvailable(additionalBytes = 0) {
   const limit = storageLimitBytes();
   const used = await getTotalMediaBytes();

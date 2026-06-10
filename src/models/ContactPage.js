@@ -9,7 +9,6 @@ const socialLinkSchema = new mongoose.Schema(
   { _id: false },
 );
 
-/** Tek doküman — İletişim sayfası içeriği */
 const contactPageSchema = new mongoose.Schema(
   {
     headline: { type: String, default: "" },

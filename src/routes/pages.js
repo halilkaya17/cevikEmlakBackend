@@ -10,7 +10,6 @@ const { reconcileMediaOnUpdate } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
-/* ─── Sayfa varsayılanları: ilk erişimde otomatik oluşturulur ─── */
 const PAGE_DEFAULTS = {
   home: HOME_PAGE_TEMPLATE,
   hakkimizda: HAKKIMIZDA_PAGE_TEMPLATE,
@@ -42,7 +41,6 @@ function normalizePage(page) {
   return source;
 }
 
-/** Public: genel-ayarlar içinde SMTP şifresini maskele */
 function normalizePagePublic(page) {
   const n = normalizePage(page);
   if (n?.pageKey === "genel-ayarlar") return maskMailSecretsForPublic(n);
@@ -59,7 +57,6 @@ function normalizePayload(pageKey, payload) {
   return payload;
 }
 
-/* Sayfa yoksa varsayılan şablonla otomatik oluştur */
 async function findOrCreate(pageKey) {
   let page = await PageContent.findOne({ pageKey });
   if (!page) {

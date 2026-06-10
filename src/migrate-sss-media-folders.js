@@ -1,16 +1,3 @@
-/**
- * SSS banner medyalarını uploads/sss/banner/ altına taşır ve DB günceller.
- *
- * Kapsam (SssContent):
- *   banner.backgroundImage, banner.image1, banner.image2
- *
- * Kullanım:
- *   node src/migrate-sss-media-folders.js --dry-run
- *   node src/migrate-sss-media-folders.js --apply
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -140,7 +127,6 @@ function resolveNewUrl(oldUrl, refCounts, cache) {
   const srcPath = absolutePathForRelative(rel);
   if (!fs.existsSync(srcPath)) {
     stats.missingFile++;
-    if (VERBOSE) console.log(`    [dosya yok] ${rel}`);
     cache.set(oldUrl, oldUrl);
     return oldUrl;
   }
@@ -151,7 +137,6 @@ function resolveNewUrl(oldUrl, refCounts, cache) {
   const copy = (refCounts.get(rel) || 0) > 1;
 
   if (DRY_RUN) {
-    console.log(`    [dry-run] ${copy ? "kopyala" : "taşı"}: ${rel} → ${newRel}`);
   } else if (!fs.existsSync(destPath)) {
     transferFile(srcPath, destPath, copy);
   }
@@ -180,18 +165,12 @@ function stableStringify(value) {
 }
 
 async function run() {
-  console.log("SSS banner medyalarını sss/banner/ altına taşıma");
-  console.log(`  mod         : ${DRY_RUN ? "dry-run" : "uygula"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}`);
-  console.log(`  hedef       : ${SSS_BANNER_DIR}\n`);
 
   await connectDatabase();
 
   const docs = await SssContent.find({});
-  console.log(`Toplam SssContent: ${docs.length}\n`);
 
   const refCounts = buildRefCounts(docs);
-  console.log(`Benzersiz local banner yolu: ${refCounts.size}\n`);
 
   for (const doc of docs) {
     stats.docsProcessed++;
@@ -204,37 +183,22 @@ async function run() {
     stats.docsUpdated++;
 
     if (DRY_RUN) {
-      console.log(`[dry-run] SssContent ${doc._id}`);
       continue;
     }
 
     await SssContent.replaceOne({ _id: doc._id }, afterObj);
-    console.log(`✓ SssContent ${doc._id}`);
   }
 
-  console.log("\n=== ÖZET ===");
-  console.log(`İşlenen doküman  : ${stats.docsProcessed}`);
-  console.log(`Güncellenen      : ${stats.docsUpdated}`);
-  console.log(`Güncellenen URL  : ${stats.urlsUpdated}`);
-  console.log(`Taşınan dosya    : ${stats.filesMoved}`);
-  console.log(`Kopyalanan dosya : ${stats.filesCopied}`);
-  console.log(`Zaten doğru klasör: ${stats.alreadyInPlace}`);
-  console.log(`Dosya bulunamadı : ${stats.missingFile}`);
-  console.log(`Cloudinary (atlandı): ${stats.skippedExternal}`);
-
   if (DRY_RUN) {
-    console.log("\nGerçek taşıma için: node src/migrate-sss-media-folders.js --apply");
   }
 
   await mongoose.disconnect();
 }
 
 run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
   try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

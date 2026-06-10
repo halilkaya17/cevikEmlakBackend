@@ -147,11 +147,6 @@ function deleteLocalRelativePath(relativePath) {
   cleanupEmptyDirsFromRelativePath(relativePath);
   return true;
 }
-
-/**
- * Dosya silindikten sonra boş kalan üst klasörleri uploads/ köküne kadar temizler.
- * listings/{id}/, docs/{id}/, media/{id}/ vb. şişmeyi önler.
- */
 function cleanupEmptyDirsFromRelativePath(relativePath) {
   if (!relativePath || relativePath.includes("://")) return;
 
@@ -171,7 +166,6 @@ function cleanupEmptyDirsFromRelativePath(relativePath) {
   }
 }
 
-/** uploads/ altındaki tüm boş klasörleri temizler (bakım scripti). */
 function cleanupAllEmptyUploadDirs() {
   const uploadRoot = path.resolve(UPLOAD_DIR);
   if (!fs.existsSync(uploadRoot)) return 0;
@@ -194,7 +188,6 @@ function cleanupAllEmptyUploadDirs() {
           changed = true;
         }
       } catch {
-        /* ignore */
       }
     };
     walk(uploadRoot);
@@ -219,7 +212,6 @@ function mkdirUploadDir(dir) {
   }
 }
 
-/** Sunucu açılışında uploads yapısını oluşturur; izin yoksa anlamlı hata verir. */
 function ensureUploadStructure() {
   mkdirUploadDir(UPLOAD_DIR);
   for (const sub of UPLOAD_SUBDIRS) {

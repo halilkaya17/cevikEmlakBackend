@@ -61,9 +61,7 @@ async function optimizeImage(buffer, mimeType) {
   let sharp;
   try {
     sharp = require("sharp");
-  } catch {
-    console.warn("[mediaOptimize] sharp paketi yuklu degil, gorsel optimize atlandi");
-    return null;
+  } catch {return null;
   }
 
   try {
@@ -93,9 +91,7 @@ async function optimizeImage(buffer, mimeType) {
     }
 
     return { buffer: output, mimeType: "image/webp", newExt: ".webp" };
-  } catch (err) {
-    console.warn("[mediaOptimize] gorsel optimize basarisiz:", err.message);
-    return null;
+  } catch (err) {return null;
   }
 }
 
@@ -177,20 +173,15 @@ async function optimizeVideo(buffer, mimeType, originalName) {
     return { buffer: output, mimeType: "video/mp4", newExt: ".mp4" };
   } catch (err) {
     if (err.code === "ENOENT") {
-      if (!ffmpegMissingLogged) {
-        console.warn("[mediaOptimize] ffmpeg bulunamadi, videolar orijinal kaydedilecek");
-        ffmpegMissingLogged = true;
+      if (!ffmpegMissingLogged) {ffmpegMissingLogged = true;
       }
-    } else {
-      console.warn("[mediaOptimize] video optimize basarisiz:", err.message);
-    }
+    } else {}
     return null;
   } finally {
     for (const p of [inputPath, outputPath]) {
       try {
         if (fs.existsSync(p)) fs.unlinkSync(p);
       } catch {
-        /* ignore */
       }
     }
   }
@@ -201,11 +192,6 @@ function applyNewExtension(fileName, newExt) {
   const base = fileName.replace(/\.[^.]+$/, "") || fileName;
   return `${base}${newExt}`;
 }
-
-/**
- * Upload buffer'ini optimize eder. Basarisiz veya atlanirsa null doner (orijinal kullanilir).
- * @returns {Promise<{ buffer: Buffer, mimeType: string, newExt: string|null }|null>}
- */
 async function optimizeUploadedFile(file) {
   if (!OPTIMIZE_CONFIG.enabled || !file?.buffer?.length) {
     return null;

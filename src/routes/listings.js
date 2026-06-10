@@ -170,7 +170,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-/** GET /api/v1/listings/categories — ilanı olan kategoriler, isim + sayı ile */
 router.get("/categories", async (_req, res, next) => {
   try {
     const [rows, allCategories] = await Promise.all([
@@ -196,11 +195,6 @@ router.get("/categories", async (_req, res, next) => {
     next(err);
   }
 });
-
-/**
- * propertyValues → showOnCard:true ve değeri dolu olanları gruplara göre döner
- * [{ groupKey, groupLabel, properties: [{ key, label, icon, unit, value }] }]
- */
 function formatPropertyGroups(rawValues, fieldMap) {
   const obj =
     rawValues instanceof Map
@@ -233,7 +227,6 @@ function formatPropertyGroups(rawValues, fieldMap) {
   return Array.from(groupMap.values());
 }
 
-/** GET /api/v1/listings/cards — sadece kart için gereken alanlar */
 router.get("/cards", async (req, res, next) => {
   try {
     const query = { active: true };
@@ -344,7 +337,6 @@ router.get("/cards", async (req, res, next) => {
   }
 });
 
-/** GET /api/v1/listings/detail/:id — client detay sayfası için zenginleştirilmiş ilan */
 router.get("/detail/:id", async (req, res, next) => {
   try {
     const idParam = req.params.id;

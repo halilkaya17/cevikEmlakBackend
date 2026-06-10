@@ -1,21 +1,3 @@
-/**
- * uploads/ medya optimizasyonu — iki aşamalı:
- *   1) Dosyaları optimize et (DB'ye dokunma)
- *   2) Manifest'e göre DB güncelle + eski dosyaları sil
- *
- * Aşama 1 — dosyalar:
- *   node src/optimize-uploads-media.js --files                  # dry-run
- *   node src/optimize-uploads-media.js --files --apply          # WebP/MP4 yaz + manifest kaydet
- *   node src/optimize-uploads-media.js --files --apply --verbose
- *   node src/optimize-uploads-media.js --files --apply --images-only
- *
- * Aşama 2 — veritabanı (manifest hazır olduktan sonra):
- *   node src/optimize-uploads-media.js --db                     # dry-run
- *   node src/optimize-uploads-media.js --db --apply             # DB güncelle + eski dosyaları sil
- *
- * Ortam: MONGODB_URI, PUBLIC_API_URL, UPLOAD_DIR (.env)
- */
-
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 const fs = require("fs");
@@ -84,24 +66,9 @@ const stats = {
   oldFilesRemoved: 0,
 };
 
-/** @type {Map<string, { newRel: string, mimeType: string, size: number, fileName: string, bytesBefore?: number }>} */
 const replacements = new Map();
 
-function printUsage() {
-  console.log(`
-Kullanım:
-
-  Aşama 1 — dosyaları optimize et (DB'ye dokunmaz):
-    node src/optimize-uploads-media.js --files
-    node src/optimize-uploads-media.js --files --apply
-
-  Aşama 2 — manifest'e göre DB güncelle:
-    node src/optimize-uploads-media.js --db
-    node src/optimize-uploads-media.js --db --apply
-
-  Filtreler: --images-only | --videos-only | --verbose
-`);
-}
+function printUsage() {}
 
 function publicUrlForRelative(relativePath) {
   return `${PUBLIC_BASE}/uploads/${relativePath.split("/").join("/")}`;
@@ -214,9 +181,7 @@ function saveManifest() {
     uploadDir: UPLOAD_DIR,
     replacements: Object.fromEntries(replacements),
   };
-  fs.writeFileSync(MANIFEST_PATH, JSON.stringify(payload, null, 2), "utf8");
-  console.log(`\nManifest kaydedildi: ${MANIFEST_PATH}`);
-}
+  fs.writeFileSync(MANIFEST_PATH, JSON.stringify(payload, null, 2), "utf8");}
 
 function loadManifest() {
   if (!fs.existsSync(MANIFEST_PATH)) {
@@ -228,10 +193,7 @@ function loadManifest() {
 
   for (const [oldRel, meta] of Object.entries(data.replacements || {})) {
     replacements.set(normalizePathKey(oldRel), meta);
-  }
-
-  console.log(`Manifest yuklendi: ${replacements.size} esleme (${MANIFEST_PATH})`);
-  return data;
+  }return data;
 }
 
 function isAlreadyOptimized(absPath) {
@@ -247,8 +209,7 @@ async function optimizeFile(absPath) {
 
   if (isAlreadyOptimized(absPath)) {
     stats.skipped++;
-    if (VERBOSE) console.log(`  atla (hedef dosya) ${rel}`);
-    return;
+    if (VERBOSE)return;
   }
 
   const mimeType = mimeFromExt(absPath);
@@ -262,8 +223,7 @@ async function optimizeFile(absPath) {
   const newAbsGuess = path.join(path.dirname(absPath), newFileNameGuess);
   if (fs.existsSync(newAbsGuess) && APPLY) {
     stats.skipped++;
-    if (VERBOSE) console.log(`  atla (hedef zaten var) ${rel}`);
-    return;
+    if (VERBOSE)return;
   }
 
   const result = await optimizeUploadedFile({
@@ -275,8 +235,7 @@ async function optimizeFile(absPath) {
 
   if (!result) {
     stats.skipped++;
-    if (VERBOSE) console.log(`  atla  ${rel}`);
-    return;
+    if (VERBOSE)return;
   }
 
   const newFileName = applyNewExtension(path.basename(absPath), result.newExt);
@@ -285,8 +244,7 @@ async function optimizeFile(absPath) {
 
   if (normalizePathKey(newRel) === rel) {
     stats.skipped++;
-    if (VERBOSE) console.log(`  atla (ayni yol) ${rel}`);
-    return;
+    if (VERBOSE)return;
   }
 
   if (replacements.has(rel)) return;
@@ -304,61 +262,31 @@ async function optimizeFile(absPath) {
   stats.optimized++;
 
   if (!APPLY) {
-    const pct = ((1 - result.buffer.length / beforeSize) * 100).toFixed(1);
-    console.log(
-      `  [dry-run] ${rel}\n           → ${newRel}  (${formatBytes(beforeSize)} → ${formatBytes(result.buffer.length)}, -${pct}%)`,
-    );
-    replacements.set(rel, meta);
+    const pct = ((1 - result.buffer.length / beforeSize) * 100).toFixed(1);replacements.set(rel, meta);
     return;
   }
 
   fs.writeFileSync(newAbs, result.buffer);
-  replacements.set(rel, meta);
+  replacements.set(rel, meta);}
 
-  console.log(
-    `  ✓ ${rel} → ${newRel}  (${formatBytes(beforeSize)} → ${formatBytes(result.buffer.length)})`,
-  );
-}
-
-async function runFilesPhase() {
-  console.log("Aşama 1: dosya optimizasyonu");
-  console.log(`  mod         : ${APPLY ? "apply" : "dry-run"}`);
-  console.log(`  uploads     : ${UPLOAD_DIR}`);
-  if (IMAGES_ONLY) console.log("  filtre      : sadece görseller");
-  if (VIDEOS_ONLY) console.log("  filtre      : sadece videolar");
-  console.log("  DB          : dokunulmaz\n");
-
-  if (!fs.existsSync(UPLOAD_DIR)) {
+async function runFilesPhase() {if (IMAGES_ONLY)if (VIDEOS_ONLY)if (!fs.existsSync(UPLOAD_DIR)) {
     throw new Error(`uploads klasörü bulunamadı: ${UPLOAD_DIR}`);
   }
 
   const allFiles = walkUploadFiles(UPLOAD_DIR);
   const targets = allFiles.filter(shouldProcessFile);
-  stats.filesScanned = targets.length;
-
-  console.log(`Taranan dosya: ${targets.length}\n`);
-
-  for (const absPath of targets) {
+  stats.filesScanned = targets.length;for (const absPath of targets) {
     try {
       await optimizeFile(absPath);
     } catch (err) {
-      stats.failed++;
-      console.warn(`  HATA ${relativePathFromAbs(absPath)}: ${err.message}`);
-    }
+      stats.failed++;}
   }
 
-  if (!replacements.size) {
-    console.log("\nOptimize edilecek dosya yok.");
-    return;
+  if (!replacements.size) {return;
   }
 
   if (APPLY) {
-    saveManifest();
-    console.log("\nSonraki adim: node src/optimize-uploads-media.js --db --apply");
-  } else {
-    console.log(`\n${replacements.size} dosya optimize edilecek.`);
-    console.log("Dosyalari yazmak icin: node src/optimize-uploads-media.js --files --apply");
-  }
+    saveManifest();} else {}
 
   printFilesSummary();
 }
@@ -379,16 +307,10 @@ async function migrateModel(Model, label) {
     stats.dbDocsUpdated++;
 
     if (!APPLY) {
-      if (VERBOSE) console.log(`  [dry-run] ${label} ${doc._id}`);
-      continue;
+      if (VERBOSE)continue;
     }
 
-    await Model.replaceOne({ _id: doc._id }, afterObj);
-    if (VERBOSE) console.log(`  ✓ DB ${label} ${doc._id}`);
-  }
-
-  console.log(`${label}: ${docs.length} kayıt, ${updated} güncellenecek`);
-}
+    await Model.replaceOne({ _id: doc._id }, afterObj);}}
 
 async function updateMediaAssets() {
   const assets = await MediaAsset.find({});
@@ -403,8 +325,7 @@ async function updateMediaAssets() {
     stats.mediaAssetsUpdated++;
 
     if (!APPLY) {
-      if (VERBOSE) console.log(`  [dry-run] MediaAsset ${asset._id}: ${rel} → ${meta.newRel}`);
-      continue;
+      if (VERBOSE)continue;
     }
 
     asset.relativePath = meta.newRel;
@@ -414,10 +335,7 @@ async function updateMediaAssets() {
     asset.size = meta.size;
     asset.kind = mediaKind(meta.mimeType);
     await asset.save();
-  }
-
-  console.log(`MediaAsset: ${assets.length} kayıt, ${count} güncellenecek`);
-}
+  }}
 
 async function updateDocFiles() {
   const files = await DocFile.find({});
@@ -432,27 +350,21 @@ async function updateDocFiles() {
     stats.docFilesUpdated++;
 
     if (!APPLY) {
-      if (VERBOSE) console.log(`  [dry-run] DocFile ${file._id}: ${rel} → ${meta.newRel}`);
-      continue;
+      if (VERBOSE)continue;
     }
 
     file.url = publicUrlForRelative(meta.newRel);
     file.mimeType = meta.mimeType;
     file.size = meta.size;
     await file.save();
-  }
-
-  console.log(`DocFile: ${files.length} kayıt, ${count} güncellenecek`);
-}
+  }}
 
 function removeOldFiles() {
   if (!APPLY) return;
 
   for (const [oldRel, meta] of replacements) {
     const newAbs = path.join(UPLOAD_DIR, meta.newRel.split("/").join(path.sep));
-    if (!fs.existsSync(newAbs)) {
-      console.warn(`  atlandi (yeni dosya yok): ${meta.newRel}`);
-      continue;
+    if (!fs.existsSync(newAbs)) {continue;
     }
 
     const abs = path.join(UPLOAD_DIR, oldRel.split("/").join(path.sep));
@@ -461,25 +373,13 @@ function removeOldFiles() {
     try {
       fs.unlinkSync(abs);
       stats.oldFilesRemoved++;
-      cleanupEmptyDirsFromRelativePath(oldRel);
-      if (VERBOSE) console.log(`  silindi ${oldRel}`);
-    } catch (err) {
-      console.warn(`  silinemedi ${oldRel}: ${err.message}`);
-    }
+      cleanupEmptyDirsFromRelativePath(oldRel);} catch (err) {}
   }
 }
 
-async function runDbPhase() {
-  console.log("Aşama 2: veritabanı güncelleme");
-  console.log(`  mod         : ${APPLY ? "apply" : "dry-run"}`);
-  console.log(`  PUBLIC_BASE : ${PUBLIC_BASE}\n`);
+async function runDbPhase() {loadManifest();
 
-  loadManifest();
-
-  await connectDatabase();
-
-  console.log("Veritabanı taranıyor...\n");
-  await migrateModel(Listing, "Listing");
+  await connectDatabase();await migrateModel(Listing, "Listing");
   await migrateModel(PageContent, "PageContent");
   await migrateModel(BlogPost, "BlogPost");
   await migrateModel(Agent, "Agent");
@@ -487,13 +387,7 @@ async function runDbPhase() {
   await updateMediaAssets();
   await updateDocFiles();
 
-  if (APPLY) {
-    console.log("\nEski dosyalar siliniyor...");
-    removeOldFiles();
-    console.log("\nTamamlandi. Manifest dosyasini saklayabilir veya silebilirsiniz.");
-  } else {
-    console.log("\nDB guncellemek icin: node src/optimize-uploads-media.js --db --apply");
-  }
+  if (APPLY) {removeOldFiles();} else {}
 
   printDbSummary();
   await mongoose.disconnect();
@@ -501,24 +395,9 @@ async function runDbPhase() {
 
 function printFilesSummary() {
   const saved = stats.bytesBefore - stats.bytesAfter;
-  const pct = stats.bytesBefore > 0 ? ((saved / stats.bytesBefore) * 100).toFixed(1) : "0";
+  const pct = stats.bytesBefore > 0 ? ((saved / stats.bytesBefore) * 100).toFixed(1) : "0";}
 
-  console.log("\n=== DOSYA ÖZETİ ===");
-  console.log(`Optimize edilen : ${stats.optimized}`);
-  console.log(`Atlanan         : ${stats.skipped}`);
-  console.log(`Hata            : ${stats.failed}`);
-  console.log(`Boyut (önce)    : ${formatBytes(stats.bytesBefore)}`);
-  console.log(`Boyut (sonra)   : ${formatBytes(stats.bytesAfter)}`);
-  console.log(`Tasarruf        : ${formatBytes(saved)} (${pct}%)`);
-}
-
-function printDbSummary() {
-  console.log("\n=== DB ÖZETİ ===");
-  console.log(`DB doküman      : ${stats.dbDocsUpdated}`);
-  console.log(`MediaAsset      : ${stats.mediaAssetsUpdated}`);
-  console.log(`DocFile         : ${stats.docFilesUpdated}`);
-  console.log(`Silinen eski    : ${stats.oldFilesRemoved}`);
-}
+function printDbSummary() {}
 
 async function run() {
   if (!MODE_FILES && !MODE_DB) {
@@ -526,9 +405,7 @@ async function run() {
     process.exit(1);
   }
 
-  if (MODE_FILES && MODE_DB) {
-    console.error("Hata: --files ve --db ayni anda kullanilamaz.");
-    process.exit(1);
+  if (MODE_FILES && MODE_DB) {process.exit(1);
   }
 
   if (MODE_FILES) {
@@ -539,12 +416,9 @@ async function run() {
   await runDbPhase();
 }
 
-run().catch(async (err) => {
-  console.error("\nHata:", err.message || err);
-  try {
+run().catch(async (err) => {try {
     await mongoose.disconnect();
   } catch {
-    /* ignore */
   }
   process.exit(1);
 });

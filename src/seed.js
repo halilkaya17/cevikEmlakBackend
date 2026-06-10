@@ -700,8 +700,6 @@ async function seed() {
     { upsert: true },
   );
 
-  // (Eski ön seed - artık findOrCreate ile yönetiliyor, $setOnInsert ile korunuyor)
-
   await PageContent.updateOne(
     { pageKey: "home" },
     { $setOnInsert: {
@@ -784,7 +782,6 @@ async function seed() {
     { upsert: true },
   );
 
-  // ── Hakkımızda sayfası ──
   await PageContent.updateOne(
     { pageKey: "hakkimizda" },
     { $setOnInsert: {
@@ -861,13 +858,8 @@ async function seed() {
     { upsert: true },
   );
 
-  await seedSertifikalar();
-
-  console.log("Seed tamamlandi");
-  process.exit(0);
+  await seedSertifikalar();process.exit(0);
 }
 
-seed().catch((error) => {
-  console.error(error);
-  process.exit(1);
+seed().catch((error) => {process.exit(1);
 });

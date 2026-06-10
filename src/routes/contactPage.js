@@ -26,7 +26,6 @@ async function getSocialLinks() {
   return extractSocialLinks(normalizeGeneralSettings(settingsPage));
 }
 
-/** GET — herkese açık */
 router.get("/", async (_req, res, next) => {
   try {
     let doc = await ContactPage.findOne();
@@ -50,7 +49,6 @@ function sanitizeBody(body) {
   return out;
 }
 
-/** PUT — yönetim */
 router.put("/", requireAuth, async (req, res, next) => {
   try {
     const body = sanitizeBody(req.body);

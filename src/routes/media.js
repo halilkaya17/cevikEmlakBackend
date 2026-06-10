@@ -72,16 +72,6 @@ router.get("/quota", requireAuth, async (_req, res, next) => {
     next(error);
   }
 });
-
-/**
- * POST /api/v1/media
- * Query:
- *   scope=library|listing|blog|agent|page|doc|sss  (varsayılan: library)
- *   entityId=...   (listing/blog/agent/doc için zorunlu)
- *   pageKey=...    (scope=page için zorunlu)
- *
- * Her yükleme MediaAsset kaydı oluşturur.
- */
 router.post("/", requireAuth, upload.array("files", 20), async (req, res, next) => {
   try {
     const files = req.files || [];

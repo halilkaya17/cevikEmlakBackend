@@ -22,13 +22,8 @@ async function main() {
       role: "admin",
     },
     { upsert: true },
-  );
-
-  console.log(`AdminUser upserted: ${email}`);
-  process.exit(0);
+  );process.exit(0);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
+main().catch((error) => {process.exit(1);
 });
