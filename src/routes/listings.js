@@ -34,13 +34,16 @@ function formatListing(listing) {
 }
 
 function fingerprint(req) {
+  const clientId = req.headers["x-client-id"];
+  if (clientId && String(clientId).trim()) {
+    return crypto.createHash("sha256").update(String(clientId).trim()).digest("hex");
+  }
   const raw =
-    req.headers["x-client-id"] ||
     req.headers["x-forwarded-for"] ||
     req.ip ||
     req.socket?.remoteAddress ||
     "unknown";
-  return crypto.createHash("sha256").update(String(raw).split(",")[0]).digest("hex");
+  return crypto.createHash("sha256").update(String(raw).split(",")[0].trim()).digest("hex");
 }
 
 router.get("/", async (req, res, next) => {

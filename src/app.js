@@ -9,6 +9,8 @@ const rateLimit = require("express-rate-limit");
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 const { UPLOAD_DIR, ensureUploadStructure } = require("./services/mediaStorage");
 
 ensureUploadStructure();
@@ -131,6 +133,8 @@ const apiRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Cok fazla istek. Lutfen bir dakika sonra tekrar deneyin." },
+  skip: (req) =>
+    req.method === "POST" && /\/listings\/[^/]+\/view\/?$/.test(req.path || req.url || ""),
 });
 
 app.use(express.json({ limit: "2mb" }));

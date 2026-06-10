@@ -3,6 +3,7 @@ const Agent = require("../models/Agent");
 const BlogPost = require("../models/BlogPost");
 const Category = require("../models/Category");
 const Listing = require("../models/Listing");
+const ListingView = require("../models/ListingView");
 const MediaAsset = require("../models/MediaAsset");
 const { requireAuth } = require("../middleware/auth");
 
@@ -29,6 +30,7 @@ router.get("/", requireAuth, async (_req, res, next) => {
       agentListingCounts,
       agentDocs,
       viewHistory,
+      totalViewEvents,
     ] = await Promise.all([
       Listing.countDocuments({ active: true }),
       Listing.countDocuments({ active: true, status: "published" }),
@@ -65,18 +67,24 @@ router.get("/", requireAuth, async (_req, res, next) => {
         { $sort: { count: -1 } },
       ]),
       Agent.find({ active: true }).select("_id name firstName lastName title photo").lean(),
-      // Son 7 günlük günlük görüntülenme toplamı
-      Listing.aggregate([
-        { $match: { active: true, updatedAt: { $gte: sevenDaysAgo } } },
+      // Son 7 gün: ListingView kayıtlarından günlük benzersiz ziyaret sayısı
+      ListingView.aggregate([
+        { $match: { createdAt: { $gte: sevenDaysAgo } } },
         {
           $group: {
-            _id: { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } },
-            views: { $sum: "$viewCount" },
+            _id: {
+              $dateToString: {
+                format: "%Y-%m-%d",
+                date: "$createdAt",
+                timezone: "Europe/Istanbul",
+              },
+            },
+            views: { $sum: 1 },
           },
         },
         { $sort: { _id: 1 } },
-        { $limit: 7 },
       ]),
+      ListingView.countDocuments(),
     ]);
 
     // Kategori isimlerini çek
@@ -118,7 +126,7 @@ router.get("/", requireAuth, async (_req, res, next) => {
       };
     };
 
-    const totalViews = topListings.reduce((sum, item) => sum + (item.viewCount || 0), 0);
+    const totalViews = totalViewEvents;
     const totalAssetSize = assetSizeResult[0]?.totalSize || 0;
 
     res.json({
