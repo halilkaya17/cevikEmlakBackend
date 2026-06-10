@@ -6,6 +6,7 @@ const { normalizeHakkimizdaPage, HAKKIMIZDA_PAGE_TEMPLATE } = require("../utils/
 const { normalizeBlogPage, BLOG_PAGE_TEMPLATE } = require("../utils/blogPage");
 const { normalizeGeneralSettings, GENERAL_SETTINGS_TEMPLATE, maskMailSecretsForPublic, preserveSmtpPasswordIfEmpty } = require("../utils/generalSettings");
 const { enrichHomePageFeaturedListings, enrichHomePageLocationCounts } = require("../utils/homeFeaturedListings");
+const { reconcileMediaOnUpdate } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
@@ -93,6 +94,7 @@ router.get("/:pageKey", async (req, res, next) => {
 
 router.put("/:pageKey", requireAuth, async (req, res, next) => {
   try {
+    const old = await PageContent.findOne({ pageKey: req.params.pageKey }).lean();
     let payload = normalizePayload(req.params.pageKey, req.body);
     if (req.params.pageKey === "genel-ayarlar") {
       const existing = await PageContent.findOne({ pageKey: "genel-ayarlar" }).lean();
@@ -103,6 +105,10 @@ router.put("/:pageKey", requireAuth, async (req, res, next) => {
       payload,
       { new: true, runValidators: true, upsert: true },
     );
+    await reconcileMediaOnUpdate(old, page.toObject(), {
+      excludeModel: "PageContent",
+      excludeId: page._id,
+    });
     let pageJson = normalizePagePublic(page);
     if (req.params.pageKey === "home") {
       pageJson = await enrichHomePageFeaturedListings(pageJson);

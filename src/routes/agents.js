@@ -1,6 +1,7 @@
 const express = require("express");
 const Agent = require("../models/Agent");
 const { requireAuth } = require("../middleware/auth");
+const { reconcileMediaOnUpdate, reconcileMediaOnDelete } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
@@ -38,12 +39,14 @@ router.post("/", requireAuth, async (req, res, next) => {
 /** PUT /api/v1/agents/:id */
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
+    const old = await Agent.findById(req.params.id).lean();
     const agent = await Agent.findByIdAndUpdate(
       req.params.id,
       normalizeBody(req.body),
       { new: true, runValidators: true },
     );
     if (!agent) return res.status(404).json({ message: "Danışman bulunamadı" });
+    await reconcileMediaOnUpdate(old, agent.toObject(), { excludeModel: "Agent", excludeId: agent._id });
     return res.json({ agent });
   } catch (error) {
     return next(error);
@@ -53,6 +56,9 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 /** DELETE /api/v1/agents/:id */
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
+    const old = await Agent.findById(req.params.id).lean();
+    if (!old) return res.status(404).end();
+    await reconcileMediaOnDelete(old, { excludeModel: "Agent", excludeId: old._id });
     await Agent.findByIdAndDelete(req.params.id);
     res.status(204).end();
   } catch (error) {

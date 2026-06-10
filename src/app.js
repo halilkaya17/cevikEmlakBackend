@@ -9,8 +9,20 @@ const rateLimit = require("express-rate-limit");
 
 const app = express();
 
-const uploadDir = path.join(__dirname, "../uploads");
-fs.mkdirSync(uploadDir, { recursive: true });
+const { UPLOAD_DIR, ensureUploadStructure } = require("./services/mediaStorage");
+
+ensureUploadStructure();
+const uploadDir = UPLOAD_DIR;
+
+function publicApiOrigin() {
+  const raw = process.env.PUBLIC_API_URL || "";
+  if (!raw) return "";
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return "";
+  }
+}
 
 const adminDir = path.join(__dirname, "../../admin");
 
@@ -96,7 +108,14 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://*.amazonaws.com"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://res.cloudinary.com",
+          "https://*.amazonaws.com",
+          ...(publicApiOrigin() ? [publicApiOrigin()] : []),
+        ],
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https:", "data:"],
         objectSrc: ["'none'"],
@@ -106,7 +125,14 @@ app.use(
   }),
 );
 
-app.use(rateLimit({ windowMs: 60 * 1000, max: 300 }));
+const apiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Cok fazla istek. Lutfen bir dakika sonra tekrar deneyin." },
+});
+
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(uploadDir));
@@ -130,6 +156,8 @@ app.get("/giris", (_req, res) => {
 });
 
 const API_PREFIX = "/api/v1";
+
+app.use(API_PREFIX, apiRateLimiter);
 
 app.get(`${API_PREFIX}/health`, (_req, res) => {
   res.json({ ok: true, service: "cevik-emlak-backend" });

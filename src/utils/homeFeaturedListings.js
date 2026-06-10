@@ -4,6 +4,7 @@ const { formatListingDetailPublic } = require("./listingDetailFormat");
 /**
  * locations → cards (location-list) bloğundaki her kartın count değerini
  * gerçek ilan sayısıyla günceller. neighborhood varsa onu da filtreler.
+ * Proje kategorisi hariç tutulur (ilan listesi /cards ile aynı mantık).
  */
 async function enrichHomePageLocationCounts(normalizedPage) {
   if (!normalizedPage || normalizedPage.pageKey !== "home") return normalizedPage;
@@ -14,7 +15,11 @@ async function enrichHomePageLocationCounts(normalizedPage) {
 
   cardsBlock.value = await Promise.all(
     cardsBlock.value.map(async (card) => {
-      const q = { active: true, status: "published" };
+      const q = {
+        active: true,
+        status: "published",
+        categorySlug: { $ne: "proje" },
+      };
       if (card.city?.trim()) q.city = card.city.trim();
       if (card.district?.trim()) q.district = card.district.trim();
       if (card.neighborhood?.trim()) q.neighborhood = { $regex: card.neighborhood.trim(), $options: "i" };

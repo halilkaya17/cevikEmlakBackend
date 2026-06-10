@@ -1,60 +1,59 @@
 const express = require("express");
-const { Readable } = require("stream");
+const multer = require("multer");
+const path = require("path");
 const MediaAsset = require("../models/MediaAsset");
 const { requireAuth } = require("../middleware/auth");
-const { upload, IMAGE_SIZE_LIMIT, VIDEO_SIZE_LIMIT } = require("../middleware/upload");
+const { IMAGE_SIZE_LIMIT, VIDEO_SIZE_LIMIT, DOCUMENT_SIZE_LIMIT } = require("../middleware/upload");
+const { saveUploadedFile, mediaKind } = require("../services/mediaStorage");
+const { deleteMediaAssetById } = require("../services/mediaReconcile");
+const { getStorageQuota } = require("../services/storageQuota");
+
+const DOCUMENT_EXTENSIONS = new Set([
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".rtf", ".odt", ".ods",
+]);
+
+function isAllowedMediaUpload(file) {
+  const mime = String(file.mimetype || "").toLowerCase();
+  const ext = path.extname(file.originalname || "").toLowerCase();
+
+  if (mime.startsWith("image/") || mime.startsWith("video/")) return true;
+  if (mime.includes("pdf") || ext === ".pdf") return true;
+
+  const docMimeHints = [
+    "msword",
+    "wordprocessingml",
+    "spreadsheetml",
+    "excel",
+    "powerpoint",
+    "presentationml",
+    "text/plain",
+    "text/csv",
+    "application/rtf",
+    "opendocument",
+  ];
+  if (docMimeHints.some((hint) => mime.includes(hint))) return true;
+  if (DOCUMENT_EXTENSIONS.has(ext)) return true;
+  if (mime === "application/octet-stream" && DOCUMENT_EXTENSIONS.has(ext)) return true;
+
+  return false;
+}
+
+function uploadSizeLimit(file) {
+  if (file.mimetype.startsWith("video/")) return VIDEO_SIZE_LIMIT;
+  if (file.mimetype.startsWith("image/")) return IMAGE_SIZE_LIMIT;
+  return DOCUMENT_SIZE_LIMIT;
+}
 
 const router = express.Router();
 
-/* ─── Cloudinary ─── */
-function cloudinaryV2() {
-  const { v2: cloudinary } = require("cloudinary");
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dqsuchxee",
-    api_key: process.env.CLOUDINARY_API_KEY || "922416189361868",
-    api_secret: process.env.CLOUDINARY_API_SECRET || "-hBd3q-NlhaV_f4FHGDETOkomxc",
-  });
-  return cloudinary;
-}
-
-function uploadToCloudinary(buffer, mimetype, originalname) {
-  return new Promise((resolve, reject) => {
-    const cloudinary = cloudinaryV2();
-    const isVideo = mimetype.startsWith("video/");
-    const resourceType = isVideo ? "video" : "image";
-    const ext = require("path").extname(originalname || "").replace(".", "");
-
-    const options = {
-      resource_type: resourceType,
-      folder: "cevik-emlak",
-      // Video için format belirtme: Cloudinary'nin kendi formatını seçmesine izin ver
-      // ve büyük dosyalarda senkron dönüştürme hatasını önlemek için async kullan
-      ...(isVideo
-        ? { eager_async: true }
-        : { format: ext || undefined }),
-    };
-
-    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-    Readable.from(buffer).pipe(stream);
-  });
-}
-
-/* ─── Helpers ─── */
-function localPublicUrl(file) {
-  if (file.location) return file.location;
-  const base = process.env.PUBLIC_API_URL || `http://localhost:${process.env.PORT || 5001}`;
-  return `${base}/uploads/${file.filename}`;
-}
-
-function mediaKind(mimeType) {
-  if (mimeType.startsWith("image/")) return "image";
-  if (mimeType.startsWith("video/")) return "video";
-  if (mimeType.includes("pdf") || mimeType.includes("document")) return "document";
-  return "other";
-}
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: DOCUMENT_SIZE_LIMIT },
+  fileFilter: (_req, file, cb) => {
+    const ok = isAllowedMediaUpload(file);
+    cb(ok ? null : new Error("Desteklenmeyen dosya türü"), ok);
+  },
+});
 
 router.get("/", requireAuth, async (_req, res, next) => {
   try {
@@ -65,57 +64,82 @@ router.get("/", requireAuth, async (_req, res, next) => {
   }
 });
 
+router.get("/quota", requireAuth, async (_req, res, next) => {
+  try {
+    const quota = await getStorageQuota();
+    res.json({ quota });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/v1/media
+ * Query:
+ *   scope=library|listing|blog|agent|page|doc|sss  (varsayılan: library)
+ *   entityId=...   (listing/blog/agent/doc için zorunlu)
+ *   pageKey=...    (scope=page için zorunlu)
+ *
+ * Her yükleme MediaAsset kaydı oluşturur.
+ */
 router.post("/", requireAuth, upload.array("files", 20), async (req, res, next) => {
   try {
     const files = req.files || [];
-    const isCloudinary = process.env.STORAGE_DRIVER === "cloudinary";
-    // ?save=false → sadece Cloudinary'e yükle, medya kütüphanesine kaydetme
-    const saveToLibrary = req.query.save !== "false";
+    if (!files.length) return res.status(400).json({ error: "Dosya gereklidir" });
 
-    // Tür bazlı boyut kontrolü
     for (const file of files) {
-      const isVideo = file.mimetype.startsWith("video/");
-      const limit = isVideo ? VIDEO_SIZE_LIMIT : IMAGE_SIZE_LIMIT;
+      const limit = uploadSizeLimit(file);
       if (file.size > limit) {
         const mb = Math.round(limit / 1024 / 1024);
         return res.status(400).json({ error: `${file.originalname}: maksimum dosya boyutu ${mb} MB` });
       }
     }
 
-    const assetDocs = await Promise.all(
-      files.map(async (file) => {
-        let url;
-        if (isCloudinary) {
-          const result = await uploadToCloudinary(file.buffer, file.mimetype, file.originalname);
-          url = result.secure_url;
-        } else {
-          url = localPublicUrl(file);
-        }
-        return {
-          fileName: file.filename || file.originalname,
-          originalName: file.originalname,
-          url,
-          mimeType: file.mimetype,
-          size: file.size,
-          kind: mediaKind(file.mimetype || ""),
-          type: file.mimetype.startsWith("video/") ? "video" : "image",
-        };
-      }),
-    );
+    const scopeParams = {
+      scope: req.query.scope,
+      entityId: req.query.entityId,
+      pageKey: req.query.pageKey,
+    };
 
-    const assets = saveToLibrary
-      ? await MediaAsset.insertMany(assetDocs)
-      : assetDocs;
+    const assets = [];
+    for (const file of files) {
+      const saved = await saveUploadedFile(file, scopeParams);
+      const asset = await MediaAsset.create({
+        _id: saved.assetId,
+        fileName: saved.fileName,
+        originalName: saved.originalName,
+        url: saved.url,
+        relativePath: saved.relativePath,
+        cloudinaryId: saved.cloudinaryId,
+        mimeType: saved.mimeType,
+        size: saved.size,
+        kind: saved.kind || mediaKind(file.mimetype || ""),
+        scope: saved.scope,
+        entityId: saved.entityId,
+        pageKey: saved.pageKey,
+      });
+      assets.push(asset);
+    }
 
     res.status(201).json({ assets });
   } catch (error) {
+    if (error.statusCode === 507 || error.code === "STORAGE_LIMIT_EXCEEDED") {
+      return res.status(507).json({ error: error.message, code: error.code });
+    }
+    if (error.code === "UPLOAD_PERMISSION_DENIED") {
+      return res.status(500).json({ error: error.message, code: error.code });
+    }
+    if (error.message?.includes("entityId") || error.message?.includes("pageKey")) {
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
 
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
-    await MediaAsset.findByIdAndDelete(req.params.id);
+    const result = await deleteMediaAssetById(req.params.id);
+    if (!result.deleted) return res.status(404).end();
     res.status(204).end();
   } catch (error) {
     next(error);

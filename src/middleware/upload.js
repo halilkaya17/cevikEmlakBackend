@@ -5,6 +5,7 @@ const { S3Client } = require("@aws-sdk/client-s3");
 
 const IMAGE_SIZE_LIMIT = 20 * 1024 * 1024;   // 20 MB
 const VIDEO_SIZE_LIMIT = 150 * 1024 * 1024;  // 150 MB
+const DOCUMENT_SIZE_LIMIT = 200 * 1024 * 1024; // 200 MB
 
 function fileName(file) {
   const ext = path.extname(file.originalname || "");
@@ -59,4 +60,4 @@ function makeUpload() {
   });
 }
 
-module.exports = { upload: makeUpload(), IMAGE_SIZE_LIMIT, VIDEO_SIZE_LIMIT };
+module.exports = { upload: makeUpload(), IMAGE_SIZE_LIMIT, VIDEO_SIZE_LIMIT, DOCUMENT_SIZE_LIMIT };

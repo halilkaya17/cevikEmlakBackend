@@ -1,6 +1,7 @@
 const express = require("express");
 const SssContent = require("../models/SssContent");
 const { requireAuth } = require("../middleware/auth");
+const { reconcileMediaOnUpdate } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ router.get("/", async (_req, res, next) => {
 router.put("/", requireAuth, async (req, res, next) => {
   try {
     const { banner, categories } = req.body;
+    const old = await SssContent.findOne().lean();
     let doc = await SssContent.findOne();
     if (!doc) {
       doc = await SssContent.create({ banner, categories });
@@ -29,6 +31,10 @@ router.put("/", requireAuth, async (req, res, next) => {
       doc.categories = categories ?? doc.categories;
       await doc.save();
     }
+    await reconcileMediaOnUpdate(old, doc.toObject(), {
+      excludeModel: "SssContent",
+      excludeId: doc._id,
+    });
     res.json({ sss: doc.toObject() });
   } catch (err) {
     next(err);

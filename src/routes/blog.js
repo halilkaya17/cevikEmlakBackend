@@ -2,6 +2,7 @@ const express = require("express");
 const BlogPost = require("../models/BlogPost");
 const { requireAuth } = require("../middleware/auth");
 const { toSlug } = require("../utils/slug");
+const { reconcileMediaOnUpdate, reconcileMediaOnDelete } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
@@ -85,6 +86,7 @@ router.post("/", requireAuth, async (req, res, next) => {
 
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
+    const old = await BlogPost.findById(req.params.id).lean();
     const payload = { ...req.body };
     delete payload.category;
     if (payload.title && !payload.slug) payload.slug = toSlug(payload.title);
@@ -105,6 +107,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       runValidators: true,
     });
     if (!post) return res.status(404).json({ message: "Blog yazisi bulunamadi" });
+    await reconcileMediaOnUpdate(old, post.toObject(), { excludeModel: "BlogPost", excludeId: post._id });
     return res.json({ post });
   } catch (error) {
     return next(error);
@@ -113,6 +116,9 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
+    const old = await BlogPost.findById(req.params.id).lean();
+    if (!old) return res.status(404).end();
+    await reconcileMediaOnDelete(old, { excludeModel: "BlogPost", excludeId: old._id });
     await BlogPost.findByIdAndDelete(req.params.id);
     res.status(204).end();
   } catch (error) {

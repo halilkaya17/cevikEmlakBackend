@@ -1,13 +1,15 @@
 const express = require("express");
-const { Readable } = require("stream");
 const multer = require("multer");
+const mongoose = require("mongoose");
 const DocCategory = require("../models/DocCategory");
 const DocFile = require("../models/DocFile");
+const MediaAsset = require("../models/MediaAsset");
 const { requireAuth } = require("../middleware/auth");
+const { saveUploadedFile, mediaKind } = require("../services/mediaStorage");
+const { reconcileMediaOnDelete } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
-/* ─── Herkese açık okuma (site /sertifikalar) ─── */
 router.get("/public", async (_req, res, next) => {
   try {
     const categories = await DocCategory.find().sort({ order: 1, createdAt: 1 }).lean();
@@ -39,49 +41,10 @@ router.get("/public", async (_req, res, next) => {
 
 router.use(requireAuth);
 
-/* ─── Cloudinary ─── */
-function cloudinaryV2() {
-  const { v2: cloudinary } = require("cloudinary");
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dqsuchxee",
-    api_key: process.env.CLOUDINARY_API_KEY || "922416189361868",
-    api_secret: process.env.CLOUDINARY_API_SECRET || "-hBd3q-NlhaV_f4FHGDETOkomxc",
-  });
-  return cloudinary;
-}
-
-function uploadToCloudinary(buffer, mimetype, originalname) {
-  return new Promise((resolve, reject) => {
-    const cloudinary = cloudinaryV2();
-    let resourceType = "raw";
-    if (mimetype.startsWith("image/")) resourceType = "image";
-    else if (mimetype.startsWith("video/")) resourceType = "video";
-
-    const opts = {
-      resource_type: resourceType,
-      folder: "cevik-emlak/docs",
-      use_filename: true,
-      unique_filename: true,
-    };
-    if (resourceType === "video") opts.eager_async = true;
-
-    const stream = cloudinary.uploader.upload_stream(opts, (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-    Readable.from(buffer).pipe(stream);
-  });
-}
-
-/* Dosya yükleme için memory storage */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 },
 });
-
-/* ════════════════════════════════════════
-   KATEGORİLER
-════════════════════════════════════════ */
 
 router.get("/categories", async (_req, res, next) => {
   try {
@@ -114,15 +77,15 @@ router.put("/categories/:id", async (req, res, next) => {
 
 router.delete("/categories/:id", async (req, res, next) => {
   try {
+    const files = await DocFile.find({ categoryId: req.params.id }).lean();
+    for (const file of files) {
+      await reconcileMediaOnDelete(file, { excludeModel: "DocFile", excludeId: file._id });
+    }
     await DocFile.deleteMany({ categoryId: req.params.id });
     await DocCategory.findByIdAndDelete(req.params.id);
     return res.status(204).end();
   } catch (e) { return next(e); }
 });
-
-/* ════════════════════════════════════════
-   DOSYALAR
-════════════════════════════════════════ */
 
 router.get("/categories/:id/files", async (req, res, next) => {
   try {
@@ -140,31 +103,45 @@ router.post("/categories/:id/files", upload.single("file"), async (req, res, nex
     if (!file) return res.status(400).json({ message: "Dosya gereklidir" });
 
     const name = req.body.name?.trim() || file.originalname;
-    const isCloudinary = process.env.STORAGE_DRIVER === "cloudinary";
-
-    let url = "";
-    let cloudinaryId = "";
-
-    if (isCloudinary) {
-      const result = await uploadToCloudinary(file.buffer, file.mimetype, file.originalname);
-      url = result.secure_url;
-      cloudinaryId = result.public_id;
-    } else {
-      url = `/uploads/${file.filename || file.originalname}`;
-    }
+    const docId = new mongoose.Types.ObjectId();
+    const saved = await saveUploadedFile(file, { scope: "doc", entityId: String(docId) });
 
     const doc = await DocFile.create({
+      _id: docId,
       categoryId: req.params.id,
       name,
-      url,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      cloudinaryId,
+      url: saved.url,
+      originalName: saved.originalName,
+      mimeType: saved.mimeType,
+      size: saved.size,
+      cloudinaryId: saved.cloudinaryId,
+    });
+
+    await MediaAsset.create({
+      _id: saved.assetId,
+      fileName: saved.fileName,
+      originalName: saved.originalName,
+      url: saved.url,
+      relativePath: saved.relativePath,
+      cloudinaryId: saved.cloudinaryId,
+      mimeType: saved.mimeType,
+      size: saved.size,
+      kind: saved.kind || mediaKind(saved.mimeType || ""),
+      scope: saved.scope,
+      entityId: String(docId),
+      pageKey: saved.pageKey,
     });
 
     return res.status(201).json({ file: doc });
-  } catch (e) { return next(e); }
+  } catch (e) {
+    if (e.statusCode === 507 || e.code === "STORAGE_LIMIT_EXCEEDED") {
+      return res.status(507).json({ error: e.message, code: e.code });
+    }
+    if (e.code === "UPLOAD_PERMISSION_DENIED") {
+      return res.status(500).json({ error: e.message, code: e.code });
+    }
+    return next(e);
+  }
 });
 
 router.put("/files/:id", async (req, res, next) => {
@@ -178,6 +155,9 @@ router.put("/files/:id", async (req, res, next) => {
 
 router.delete("/files/:id", async (req, res, next) => {
   try {
+    const doc = await DocFile.findById(req.params.id).lean();
+    if (!doc) return res.status(404).end();
+    await reconcileMediaOnDelete(doc, { excludeModel: "DocFile", excludeId: doc._id });
     await DocFile.findByIdAndDelete(req.params.id);
     return res.status(204).end();
   } catch (e) { return next(e); }

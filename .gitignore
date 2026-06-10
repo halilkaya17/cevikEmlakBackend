@@ -16,8 +16,9 @@ npm-debug.log*
 dist/
 build/
 
-# Uploads (isteğe bağlı - büyük dosyalar varsa)
-# uploads/
+# Uploads (medya dosyaları — repo'ya eklenmez)
+uploads/
+optimize-uploads-manifest.json
 
 # OS files
 .DS_Store

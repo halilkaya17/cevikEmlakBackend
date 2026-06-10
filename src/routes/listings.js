@@ -10,6 +10,7 @@ const {
   buildFieldMap,
   formatListingDetailPublic,
 } = require("../utils/listingDetailFormat");
+const { reconcileMediaOnUpdate, reconcileMediaOnDelete } = require("../services/mediaReconcile");
 
 const router = express.Router();
 
@@ -52,6 +53,9 @@ router.get("/", async (req, res, next) => {
     if (req.query.transactionType) query.transactionType = req.query.transactionType;
     if (req.query.city) query.city = req.query.city;
     if (req.query.district) query.district = req.query.district;
+    if (req.query.neighborhood?.trim()) {
+      query.neighborhood = { $regex: req.query.neighborhood.trim(), $options: "i" };
+    }
     if (req.query.subcategory) query.subcategory = req.query.subcategory;
     if (req.query.agent) query.agent = req.query.agent;
     if (req.query.rooms) query["propertyValues.oda-sayisi"] = req.query.rooms.replace(/ /g, "+");
@@ -237,6 +241,9 @@ router.get("/cards", async (req, res, next) => {
     if (req.query.transactionType) query.transactionType = req.query.transactionType;
     if (req.query.city) query.city = req.query.city;
     if (req.query.district) query.district = req.query.district;
+    if (req.query.neighborhood?.trim()) {
+      query.neighborhood = { $regex: req.query.neighborhood.trim(), $options: "i" };
+    }
     if (req.query.subcategory) query.subcategory = req.query.subcategory;
     if (req.query.rooms) query["propertyValues.oda-sayisi"] = req.query.rooms.replace(/ /g, "+");
     if (req.query.q) {
@@ -395,6 +402,7 @@ router.post("/", requireAuth, async (req, res, next) => {
 
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
+    const old = await Listing.findById(req.params.id).lean();
     const payload = { ...req.body };
     if (Array.isArray(req.body.contentGallery)) {
       payload.contentGallery = normalizeContentGallery(req.body.contentGallery);
@@ -412,6 +420,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
       runValidators: true,
     });
     if (!listing) return res.status(404).json({ message: "Ilan bulunamadi" });
+    await reconcileMediaOnUpdate(old, listing.toObject(), { excludeModel: "Listing", excludeId: listing._id });
     return res.json({ listing: formatListing(listing) });
   } catch (error) {
     return next(error);
@@ -420,6 +429,9 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
+    const old = await Listing.findById(req.params.id).lean();
+    if (!old) return res.status(404).end();
+    await reconcileMediaOnDelete(old, { excludeModel: "Listing", excludeId: old._id });
     await Listing.findByIdAndDelete(req.params.id);
     res.status(204).end();
   } catch (error) {
