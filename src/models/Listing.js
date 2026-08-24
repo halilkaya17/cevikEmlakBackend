@@ -51,6 +51,8 @@ const listingSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true },
     listingNo: { type: String, required: true, unique: true },
+    /** EİDS taşınmaz numarası (her ilana özel, zorunlu) */
+    tasinmazId: { type: String, required: true, trim: true },
     transactionType: { type: String, enum: ["satilik", "kiralik"], required: true },
     category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true },
     categorySlug: { type: String, required: true },

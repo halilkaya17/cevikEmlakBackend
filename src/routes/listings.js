@@ -3,6 +3,7 @@ const express = require("express");
 const Category = require("../models/Category");
 const Listing = require("../models/Listing");
 const ListingView = require("../models/ListingView");
+const AdminUser = require("../models/AdminUser");
 const { requireAuth } = require("../middleware/auth");
 const { toSlug } = require("../utils/slug");
 const {
@@ -11,8 +12,86 @@ const {
   formatListingDetailPublic,
 } = require("../utils/listingDetailFormat");
 const { reconcileMediaOnUpdate, reconcileMediaOnDelete } = require("../services/mediaReconcile");
+const {
+  extractTasinmazId,
+  getFirmaKod,
+  getVergiNo,
+  assertEidsIlIlceMatch,
+  validateTasinmaz,
+} = require("../utils/eids");
 
 const router = express.Router();
+
+/**
+ * Her ilan create/update işleminde EİDS zorunlu — atlanamaz.
+ * Kullanıcı eids + tasinmazId + vergi no + GTB taşınmaz doğrulaması + il/ilçe eşleşmesi şart.
+ */
+async function requireEidsForListing(req, { tasinmazId, propertyValues, city, district }) {
+  const admin = await AdminUser.findById(req.user.sub).select("eids");
+  if (!admin?.eids) {
+    const err = new Error("EIDS yetkilendirmesini tamamlayın. İlan kaydı için EİDS zorunludur.");
+    err.status = 403;
+    throw err;
+  }
+
+  const cityName = String(city || "").trim();
+  const districtName = String(district || "").trim();
+  if (!cityName || !districtName) {
+    const err = new Error("EIDS doğrulaması için il ve ilçe zorunludur.");
+    err.status = 400;
+    throw err;
+  }
+
+  const rawTasinmaz =
+    tasinmazId != null && String(tasinmazId).trim() !== ""
+      ? String(tasinmazId)
+      : "";
+  const fromField = rawTasinmaz.replace(/\D/g, "");
+  const resolvedTasinmazId = fromField
+    ? Number(fromField)
+    : extractTasinmazId(propertyValues);
+
+  if (!resolvedTasinmazId || Number.isNaN(resolvedTasinmazId)) {
+    const err = new Error("Taşınmaz numarası (tasinmazId) zorunludur. EIDS doğrulaması atlanamaz.");
+    err.status = 400;
+    throw err;
+  }
+
+  const vergiNo = getVergiNo();
+  if (!vergiNo) {
+    const err = new Error("Ofis vergi numarası (EIDS_VERGI_NO) yapılandırılmamış. EIDS doğrulaması yapılamaz.");
+    err.status = 500;
+    throw err;
+  }
+
+  if (!getFirmaKod()) {
+    const err = new Error("EIDS firma kodu yapılandırılmamış. EIDS doğrulaması yapılamaz.");
+    err.status = 500;
+    throw err;
+  }
+
+  const result = await validateTasinmaz({
+    FirmaKod: getFirmaKod(),
+    Kullanicikodu: admin.eids,
+    VergiNo: vergiNo,
+    TasinmazId: resolvedTasinmazId,
+  });
+  if (!result.ok || !result.data) {
+    const err = new Error(result.message || "EIDS taşınmaz doğrulaması başarısız. İlan kaydedilemez.");
+    err.status = 403;
+    throw err;
+  }
+
+  const data = result.data;
+  // Sadece il + ilçe; mahalle / ada / parsel yok sayılır
+  assertEidsIlIlceMatch({
+    city: cityName,
+    district: districtName,
+    eidsData: data,
+  });
+
+  return { admin, tasinmazId: resolvedTasinmazId, eidsData: data };
+}
 
 function formatListing(listing) {
   const doc = listing.toObject ? listing.toObject() : listing;
@@ -377,11 +456,19 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", requireAuth, async (req, res, next) => {
   try {
+    const eidsResult = await requireEidsForListing(req, {
+      tasinmazId: req.body.tasinmazId,
+      propertyValues: req.body.propertyValues,
+      city: req.body.city,
+      district: req.body.district,
+    });
+
     const category = await Category.findById(req.body.category);
     if (!category) return res.status(400).json({ message: "Kategori gecersiz" });
 
     const baseSlug = req.body.slug || req.body.title;
     const payload = { ...req.body };
+    payload.tasinmazId = String(eidsResult.tasinmazId);
     payload.contentGallery = normalizeContentGallery(req.body.contentGallery);
     const listing = await Listing.create({
       ...payload,
@@ -398,7 +485,17 @@ router.post("/", requireAuth, async (req, res, next) => {
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
     const old = await Listing.findById(req.params.id).lean();
+    if (!old) return res.status(404).json({ message: "Ilan bulunamadi" });
+
+    const eidsResult = await requireEidsForListing(req, {
+      tasinmazId: req.body.tasinmazId ?? old.tasinmazId,
+      propertyValues: req.body.propertyValues ?? old.propertyValues,
+      city: req.body.city ?? old.city,
+      district: req.body.district ?? old.district,
+    });
+
     const payload = { ...req.body };
+    payload.tasinmazId = String(eidsResult.tasinmazId);
     if (Array.isArray(req.body.contentGallery)) {
       payload.contentGallery = normalizeContentGallery(req.body.contentGallery);
     }

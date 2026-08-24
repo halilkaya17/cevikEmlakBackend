@@ -162,6 +162,7 @@ app.get(`${API_PREFIX}/health`, (_req, res) => {
 });
 
 app.use(`${API_PREFIX}/auth`, require("./routes/auth"));
+app.use(`${API_PREFIX}/eids`, require("./routes/eids"));
 app.use(`${API_PREFIX}/dashboard`, require("./routes/dashboard"));
 app.use(`${API_PREFIX}/categories`, require("./routes/categories"));
 app.use(`${API_PREFIX}/agents`, require("./routes/agents"));

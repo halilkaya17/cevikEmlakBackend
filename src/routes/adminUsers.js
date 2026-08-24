@@ -18,7 +18,7 @@ router.get("/", async (_req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: "E-posta ve şifre zorunludur" });
     }
@@ -31,9 +31,18 @@ router.post("/", async (req, res, next) => {
       email: String(email).toLowerCase().trim(),
       passwordHash,
       role: role || "admin",
+      phone: phone != null ? String(phone).trim() : "",
     });
     return res.status(201).json({
-      user: { _id: user._id, name: user.name, email: user.email, role: user.role, createdAt: user.createdAt },
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone || "",
+        eids: user.eids || "",
+        createdAt: user.createdAt,
+      },
     });
   } catch (error) {
     return next(error);
@@ -42,11 +51,12 @@ router.post("/", async (req, res, next) => {
 
 router.put("/:id", async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone } = req.body;
     const update = {};
     if (name !== undefined) update.name = name;
     if (email !== undefined) update.email = String(email).toLowerCase().trim();
     if (role !== undefined) update.role = role;
+    if (phone !== undefined) update.phone = String(phone).trim();
     if (password) {
       if (password.length < 6) {
         return res.status(400).json({ message: "Şifre en az 6 karakter olmalıdır" });
@@ -63,7 +73,7 @@ router.put("/:id", async (req, res, next) => {
 
 router.delete("/:id", async (req, res, next) => {
   try {
-    if (String(req.user?.id) === String(req.params.id)) {
+    if (String(req.user?.sub) === String(req.params.id)) {
       return res.status(400).json({ message: "Kendi hesabınızı silemezsiniz" });
     }
     const user = await AdminUser.findByIdAndDelete(req.params.id);

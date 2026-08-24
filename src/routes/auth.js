@@ -5,6 +5,17 @@ const { requireAuth, signAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
+function publicUser(admin) {
+  return {
+    id: admin._id,
+    email: admin.email,
+    name: admin.name,
+    role: admin.role,
+    phone: admin.phone || "",
+    eids: admin.eids || "",
+  };
+}
+
 router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -16,15 +27,21 @@ router.post("/login", async (req, res, next) => {
 
     return res.json({
       token: signAdmin(admin),
-      user: { id: admin._id, email: admin.email, name: admin.name, role: admin.role },
+      user: publicUser(admin),
     });
   } catch (error) {
     return next(error);
   }
 });
 
-router.get("/me", requireAuth, async (req, res) => {
-  res.json({ user: req.user });
+router.get("/me", requireAuth, async (req, res, next) => {
+  try {
+    const admin = await AdminUser.findById(req.user.sub).select("-passwordHash");
+    if (!admin) return res.status(401).json({ message: "Kullanıcı bulunamadı" });
+    return res.json({ user: publicUser(admin) });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 module.exports = router;

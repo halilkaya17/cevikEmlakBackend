@@ -6,6 +6,9 @@ const adminUserSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     name: { type: String, default: "Admin" },
     role: { type: String, default: "admin" },
+    phone: { type: String, default: "", trim: true },
+    /** GTB'den dönen kalıcı kullanıcı kodu (yetkiKodu değil) */
+    eids: { type: String, default: "", trim: true },
   },
   { timestamps: true },
 );
